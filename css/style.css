@@ -1,0 +1,41 @@
+body {
+	color: #333;
+	font: 14px/18px "HelveticaNeue", "Helvetica Neue", Helvetica, Arial,
+		sans-serif;
+	text-shadow: 0 1px 0 white;
+}
+
+#main {
+	float: left;
+	width: 70%;
+	background-color: #F9F9F9;
+}
+
+#left {
+	float: left;
+	width: 15%;
+	height: 100%
+}
+
+#card {
+	padding: 24px;
+}
+
+#content {
+    padding: 20px;
+}
+
+#contact {
+	color: #999;
+	padding: 14px;
+	float: left;
+}
+
+a {
+	color: #2FC2EF;
+}
+
+h2,h4 {
+	border-bottom: 1px solid #E8E8E8;
+	padding: 13px;
+}

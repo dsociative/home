@@ -1,0 +1,25 @@
+<html>
+<head>
+<meta charset="utf8">
+{% if page.keywords %}
+<meta name="keywords" content="{{  page.keywords | join: ','  }}" />
+{% endif %}
+<title>{{ page.title }}</title>
+<link rel="stylesheet" href="css/style.css" type="text/css">
+</head>
+<body>
+<div id="left"></div>
+<div id="main">
+  <div id="card">
+    <h2>{{ page.head }}</h2>
+    <div id="content">
+      {{ content }}
+    </div>
+  </div>
+  <div id="contact">
+    {% capture contact %}{% include contact.md %}{% endcapture %}
+    {{ contact | markdownify }}
+  </div>
+</div>
+</body>
+</html>
