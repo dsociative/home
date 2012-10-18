@@ -8,5 +8,3 @@ keywords: Python, Developer, Tornado, Redis, CI, TDD, Разработчик, Fr
 * **Tools**: test driven development, continuous integration
 * **Experience**: python, redis, tornado, mongodb
 * **Habitat**: gamedev, social games
-
-Test?
