@@ -9,3 +9,4 @@ keywords: Python, Developer, Tornado, Redis, CI, TDD, Разработчик, Fr
 * **Experience**: python, redis, tornado, mongodb
 * **Habitat**: gamedev, social games
 
+Test?
