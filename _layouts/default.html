@@ -4,6 +4,9 @@
 {% if page.keywords %}
 <meta name="keywords" content="{{  page.keywords | join: ','  }}" />
 {% endif %}
+{% if page.description %}
+<meta name="description" content="{{  page.description }}" />
+{% endif %}
 <title>{{ page.title }}</title>
 <script type="text/javascript">
 

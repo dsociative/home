@@ -3,7 +3,7 @@ layout: default
 title: Artem Prikhodin
 head: Python Developer
 keywords: Python, Developer, Tornado, Redis, CI, TDD, Разработчик, Freelance, Artem Prikhodin, Артем Приходин, Backend
-description: Artem Prikhodin's home page
+description: Artem Prikhodin is freelance Python backend developer.
 ---
 
 
