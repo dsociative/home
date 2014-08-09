@@ -7,16 +7,12 @@ description: Artem Prikhodin, freelance Python backend developer.
 ---
 
 ## Main
-* **Tools**: test driven development, continuous integration
-* **Experience**: python, redis, tornado, mongodb
+* **Tools**: Test driven development, Continuous integration, DevOps
+* **Experience**: Linux, Python, Redis, Tornado, MongoDB, ZeroMQ, Chef, Ansible, Zabbix, Docker
 * **Habitat**: gamedev, social games
-* **Internal**: [buildbot](http://build.geektech.ru), [docs](http://doc.geektech.ru)
 
-
-
-## Contacts
-> **skype - artem.prihodin**  
-> [github](https://github.com/dsociative)  
-> [linkedin](http://www.linkedin.com/pub/artem-prikhodin/37/692/ba7)  
-> [free-lance.ru](http://www.free-lance.ru/users/Disassociative/)
+## Contacts:
+> <a href="skype:artem.prihodin"><i class="fa fa-skype fa-fw"> </i>artem.prihodin</a>    
+> <a href="https://github.com/dsociative"><i class="fa fa-github fa-fw"> </i>dsociative</a>    
+> <a href="http://www.linkedin.com/pub/artem-prikhodin/37/692/ba7"><i class="fa fa-linkedin fa-fw"> </i>Artem Prikhodin</a>      
 
