@@ -7,12 +7,18 @@ description: Artem Prikhodin, freelance Python backend developer.
 ---
 
 ## Main
-* **Tools**: Test driven development, Continuous integration, DevOps
-* **Experience**: Linux, Python, Redis, Tornado, MongoDB, ZeroMQ, Chef, Ansible, Zabbix, Docker
+* **Methods**: Test driven development, Continuous integration, DevOps
+* **Tools**: Linux, Python, Redis, Tornado, MongoDB, ZeroMQ, Chef, Ansible, Zabbix, Docker
 * **Habitat**: gamedev, social games
 
-## Contacts:
-> <a href="skype:artem.prihodin"><i class="fa fa-skype fa-fw"> </i>artem.prihodin</a>    
-> <a href="https://github.com/dsociative"><i class="fa fa-github fa-fw"> </i>dsociative</a>    
-> <a href="http://www.linkedin.com/pub/artem-prikhodin/37/692/ba7"><i class="fa fa-linkedin fa-fw"> </i>Artem Prikhodin</a>      
+## Employment History
+* June 2012 - Present, **My Dragon**, Python Backend Developer & Linux System Administrator
+* April 2012 - June 2012, **ezscratch**, Python Backend Developer
+* February 2011 - April 2012, **Addicted**, Python Backend Developer
+* March 2010 - April 2011, **Ravelin**, Python Developer
+
+## Homework
+* [rmodel](https://github.com/dsociative/rmodel): Simple ORM for Redis
+* [socket_server2](https://github.com/dsociative/socket_server2): Socket server with epoll
+* [social_billing](https://github.com/dsociative/social_billing): Web server that handles payments from russian social networks
 
