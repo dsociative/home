@@ -2,14 +2,14 @@
 layout: default
 title: Artem Prikhodin
 head: Python Developer
-keywords: Python, Developer, Tornado, Redis, CI, TDD, Разработчик, Freelance, Artem Prikhodin, Артем Приходин, Backend
+keywords: Python, Developer, Tornado, Redis, CI, TDD, Разработчик, Freelance, Artem Prikhodin, Артем Приходин, Backend, Удаленно, MongoDB, ZeroMQ, Zabbix
 description: Artem Prikhodin, freelance Python backend developer.
 ---
 
 ## Main
-* **Methods**: Test driven development, Continuous integration, DevOps
+* **Practices**: Test driven development, Continuous integration, DevOps
 * **Tools**: Linux, Python, Redis, Tornado, MongoDB, ZeroMQ, Chef, Ansible, Zabbix, Docker
-* **Habitat**: gamedev, social games
+* **Scope**: gamedev, social games
 
 ## Employment History
 * June 2012 - Present, **My Dragon**, Python Backend Developer & Linux System Administrator
