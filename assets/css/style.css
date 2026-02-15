@@ -5,6 +5,7 @@
   src: url("/fonts/zed-mono-extended.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
+  font-stretch: 125%;
   font-display: swap;
 }
 
@@ -13,6 +14,7 @@
   src: url("/fonts/zed-mono-extendedbold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
+  font-stretch: 125%;
   font-display: swap;
 }
 
@@ -197,6 +199,7 @@
 
 html {
   font-family: "Zed Mono Extended", "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+  font-stretch: 125%;
   line-height: 1.45;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
