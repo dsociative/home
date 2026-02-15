@@ -1,0 +1,24 @@
+baseURL = "https://geektech.ru/"
+languageCode = "en"
+title = "geektech"
+
+[params]
+  author = "Artem Prikhodin"
+  description = "Artem Prikhodin, freelance Python backend developer."
+  keywords = ["Python", "Developer", "Backend", "Artem Prikhodin"]
+  github = "https://github.com/dsociative"
+  linkedin = "https://www.linkedin.com/in/artem-prikhodin-ba769237"
+  telegram = "https://t.me/dsociative"
+
+[menu]
+  [[menu.main]]
+    name = "Home"
+    url = "/"
+    weight = 1
+  [[menu.main]]
+    name = "Blog"
+    url = "/blog/"
+    weight = 2
+
+[markup.goldmark.renderer]
+  unsafe = true

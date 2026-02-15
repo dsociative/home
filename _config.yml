@@ -1,8 +1,0 @@
-name: geektech
-markdown: redcarpet
-highlighter: pygments
-baseurl: /
-
-collections:
-    rmodel:
-        output: true
