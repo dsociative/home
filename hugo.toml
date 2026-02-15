@@ -4,7 +4,7 @@ title = "geektech"
 
 [params]
   author = "Artem Prikhodin"
-  description = "Artem Prikhodin, freelance Python backend developer."
+  description = "Backend developer. Rust, Go, Python. 15+ years of experience."
   keywords = ["Python", "Developer", "Backend", "Artem Prikhodin"]
   github = "https://github.com/dsociative"
   linkedin = "https://www.linkedin.com/in/artem-prikhodin-ba769237"
@@ -15,10 +15,11 @@ title = "geektech"
     name = "Home"
     url = "/"
     weight = 1
-  [[menu.main]]
-    name = "Blog"
-    url = "/blog/"
-    weight = 2
 
 [markup.goldmark.renderer]
   unsafe = true
+
+enableRobotsTXT = true
+
+[sitemap]
+  changefreq = "monthly"

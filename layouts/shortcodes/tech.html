@@ -1,0 +1,36 @@
+{{- $name := .Get 0 -}}
+{{- $icons := dict
+  "ansible" "devicon-ansible-plain"
+  "aws" "devicon-amazonwebservices-plain-wordmark"
+  "clickhouse" "devicon-plain"
+  "consul" "devicon-consul-plain"
+  "docker" "devicon-docker-plain"
+  "elasticsearch" "devicon-elasticsearch-plain"
+  "ffmpeg" "devicon-plain"
+  "fluxcd" "devicon-flux-plain"
+  "go" "devicon-go-original-wordmark"
+  "graphql" "devicon-graphql-plain"
+  "grpc" "devicon-plain"
+  "helm" "devicon-helm-plain"
+  "kafka" "devicon-apachekafka-original"
+  "kubernetes" "devicon-kubernetes-plain"
+  "mongodb" "devicon-mongodb-plain"
+  "postgresql" "devicon-postgresql-plain"
+  "prometheus" "devicon-prometheus-original"
+  "protobuf" "devicon-protobuf-plain"
+  "python" "devicon-python-plain"
+  "rabbitmq" "devicon-rabbitmq-original"
+  "redis" "devicon-redis-plain"
+  "rust" "devicon-rust-original"
+  "spark" "devicon-apachespark-original"
+  "swagger" "devicon-swagger-plain"
+  "terraform" "devicon-terraform-plain"
+  "tornado" "devicon-plain"
+  "websocket" "devicon-plain"
+  "zabbix" "devicon-plain"
+  "zeromq" "devicon-plain"
+  "chef" "devicon-plain"
+-}}
+{{- $key := lower $name -}}
+{{- $icon := index $icons $key | default "devicon-plain" -}}
+<span class="tech-badge">{{- if ne $icon "devicon-plain" }}<i class="{{ $icon }}"></i> {{ end -}}{{ $name }}</span>

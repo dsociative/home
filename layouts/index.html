@@ -3,18 +3,4 @@
     {{ .Content }}
   </section>
 
-  {{ $posts := where .Site.RegularPages "Section" "blog" }}
-  {{ if $posts }}
-  <section class="recent-posts">
-    <h2>Recent Posts</h2>
-    <ul>
-      {{ range first 5 $posts }}
-      <li>
-        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
-        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan 2, 2006" }}</time>
-      </li>
-      {{ end }}
-    </ul>
-  </section>
-  {{ end }}
 {{ end }}
