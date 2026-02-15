@@ -163,6 +163,7 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 { font-size: 30px; }
 h2 { font-size: 24px; margin-top: 2.5rem; }
+.content > h2:first-child { margin-top: 0; }
 h3 { font-size: 18px; }
 
 /* Content */
