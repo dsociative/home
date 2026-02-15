@@ -59,8 +59,8 @@
   --heading-h3-color: #4c5361;
   --heading-h3-bg: #dde4f2;
 
-  --link: #6a4dff;
-  --link-hover: #614c61;
+  --link: #4c5361;
+  --link-hover: #465953;
 
   --code-fg: #465953;
   --code-bg: #d2ebe3;
@@ -86,7 +86,7 @@
   --title-color: #605a52;
 
   --social-color: #93836c;
-  --social-hover: #6a4dff;
+  --social-hover: #614c61;
 
   --statusbar-bg: #e4ddd2;
   --statusbar-fg: #605a52;
@@ -98,7 +98,7 @@
   --td-border: #f1ece4;
 
   --toggle-color: #93836c;
-  --toggle-hover: #6a4dff;
+  --toggle-hover: #614c61;
   --toggle-border: #dcd3c6;
 
   --strong-color: #605a52;
@@ -198,6 +198,9 @@
 html {
   font-family: "Zed Mono Extended", "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
   line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -261,7 +264,6 @@ main {
 
 .site-title a {
   color: inherit;
-  text-decoration: none;
 }
 
 .site-description {
@@ -281,7 +283,6 @@ main {
 
 .social-links .btn {
   color: var(--social-color);
-  text-decoration: none;
   transition: color 0.2s, transform 0.2s;
 }
 
@@ -356,7 +357,6 @@ main {
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   font-family: inherit;
-  letter-spacing: -0.03em;
   margin: 0 0 0.75rem;
 }
 
@@ -401,6 +401,13 @@ em {
   color: var(--em-color);
 }
 
+/* Dates rendered as <em> after h3 headings (e.g. "2024 — present") */
+h3 + p > em:only-child {
+  color: var(--fg-dim);
+  font-style: normal;
+  font-size: 0.875rem;
+}
+
 /* === Content === */
 
 .content {
@@ -438,13 +445,20 @@ ul li::before {
 
 a {
   color: var(--link);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
   transition: color 0.2s;
 }
 
 a:hover {
   color: var(--link-hover);
-  text-decoration: underline;
+}
+
+/* UI links — no underline */
+.site-header a,
+.vim-statusbar a {
+  text-decoration: none;
 }
 
 /* === Post list === */
