@@ -1,5 +1,15 @@
-<footer class="site-footer">
-  <div class="container">
-    <p>&copy; {{ now.Year }} {{ .Site.Params.author }}</p>
-  </div>
+<footer class="vim-statusbar">
+  <span class="mode">NORMAL</span>
+  <span class="sep">|</span>
+  <span class="file-path">{{ .RelPermalink }}</span>
+  <span class="sep">|</span>
+  <span>utf-8</span>
+  <span class="sep">|</span>
+  <span>html</span>
+  <span class="sep">|</span>
+  <span id="vim-theme">doom-flatwhite</span>
+  <span class="spacer"></span>
+  <span class="pos" id="vim-pos">Ln 1, Col 1</span>
+  <span class="sep">|</span>
+  <span class="pos" id="vim-scroll">Top</span>
 </footer>

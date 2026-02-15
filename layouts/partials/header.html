@@ -3,9 +3,10 @@
     <div class="header-top">
       <div>
         <h1 class="site-title"><a href="{{ .Site.Home.RelPermalink }}">{{ .Site.Title }}</a></h1>
-        <h2 class="site-description">{{ .Site.Params.description }}</h2>
+        <p class="site-description">{{ .Site.Params.description }}</p>
       </div>
-      <div class="lang-switcher">
+      <div class="header-controls">
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"></button>
         {{ range .Translations }}
           <a href="{{ .RelPermalink }}" class="lang-link">{{ .Language.LanguageName }}</a>
         {{ end }}

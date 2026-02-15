@@ -11,5 +11,56 @@
     </main>
   </div>
   {{- partial "footer.html" . -}}
+  <script>
+  (function() {
+    // Theme toggle
+    var btn = document.getElementById('theme-toggle');
+    var themeLabel = document.getElementById('vim-theme');
+    function updateUI() {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      btn.textContent = dark ? '\u263E' : '\u2600';
+      if (themeLabel) themeLabel.textContent = dark ? 'doom-gruvbox' : 'doom-flatwhite';
+    }
+    updateUI();
+    btn.addEventListener('click', function() {
+      var curr = document.documentElement.getAttribute('data-theme');
+      var next = curr === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateUI();
+    });
+
+    // Follow OS theme changes in real time
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+      localStorage.removeItem('theme');
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      updateUI();
+    });
+
+    // Scroll tracking for statusbar
+    var posEl = document.getElementById('vim-pos');
+    var scrollEl = document.getElementById('vim-scroll');
+    var blocks = document.querySelectorAll('main p, main h1, main h2, main h3, main h4, main h5, main h6, main li, main pre, main blockquote, main table, main .tech-badges');
+    function updateScroll() {
+      var scrollTop = window.scrollY;
+      var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      var lineNum = 1;
+      for (var i = 0; i < blocks.length; i++) {
+        if (blocks[i].getBoundingClientRect().top <= window.innerHeight / 2) {
+          lineNum = i + 1;
+        }
+      }
+      if (posEl) posEl.textContent = 'Ln ' + lineNum + ', Col 1';
+      if (scrollEl) {
+        if (docHeight <= 0) scrollEl.textContent = 'All';
+        else if (scrollTop <= 0) scrollEl.textContent = 'Top';
+        else if (scrollTop >= docHeight - 1) scrollEl.textContent = 'Bot';
+        else scrollEl.textContent = Math.round(scrollTop / docHeight * 100) + '%';
+      }
+    }
+    window.addEventListener('scroll', updateScroll, { passive: true });
+    updateScroll();
+  })();
+  </script>
 </body>
 </html>
