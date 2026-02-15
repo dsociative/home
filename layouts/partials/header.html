@@ -1,7 +1,16 @@
 <header class="site-header">
   <div class="container">
-    <h1 class="site-title"><a href="/">{{ .Site.Title }}</a></h1>
-    <h2 class="site-description">{{ .Site.Params.description }}</h2>
+    <div class="header-top">
+      <div>
+        <h1 class="site-title"><a href="{{ .Site.Home.RelPermalink }}">{{ .Site.Title }}</a></h1>
+        <h2 class="site-description">{{ .Site.Params.description }}</h2>
+      </div>
+      <div class="lang-switcher">
+        {{ range .Translations }}
+          <a href="{{ .RelPermalink }}" class="lang-link">{{ .Language.LanguageName }}</a>
+        {{ end }}
+      </div>
+    </div>
 
     <nav class="social-links">
       <a href="{{ .Site.Params.github }}" aria-label="GitHub" class="btn">

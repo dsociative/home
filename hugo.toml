@@ -1,11 +1,32 @@
 baseURL = "https://geektech.ru/"
-languageCode = "en"
 title = "Artem Prikhodin"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = true
+
+[languages]
+  [languages.en]
+    languageCode = "en"
+    languageName = "EN"
+    title = "Artem Prikhodin"
+    weight = 1
+    contentDir = "content/en"
+    [languages.en.params]
+      description = "Backend Developer — Rust, Go, Python. 15+ years building high-load systems."
+      keywords = ["Backend Developer", "Rust", "Go", "Python", "Artem Prikhodin"]
+
+  [languages.ru]
+    languageCode = "ru"
+    languageName = "RU"
+    title = "Артём Приходин"
+    weight = 2
+    contentDir = "content/ru"
+    [languages.ru.params]
+      description = "Бэкенд-разработчик — Rust, Go, Python. 15+ лет опыта в высоконагруженных системах."
+      keywords = ["Бэкенд-разработчик", "Rust", "Go", "Python", "Артём Приходин"]
 
 [params]
   author = "Artem Prikhodin"
-  description = "Backend Developer — Rust, Go, Python. 15+ years building high-load systems."
-  keywords = ["Python", "Developer", "Backend", "Artem Prikhodin"]
+
   github = "https://github.com/dsociative"
   linkedin = "https://www.linkedin.com/in/artem-prikhodin-ba769237"
   telegram = "https://t.me/dsociative"

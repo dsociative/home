@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ .Permalink }}</title>
+  <link rel="canonical" href="{{ .Permalink }}">
+  <script>
+    if (navigator.language && navigator.language.startsWith('ru')) {
+      location.replace('/ru/');
+    } else {
+      location.replace('/en/');
+    }
+  </script>
+  <noscript>
+    <meta http-equiv="refresh" content="0; url={{ .Permalink }}">
+  </noscript>
+</head>
+</html>

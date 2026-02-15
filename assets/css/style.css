@@ -79,7 +79,7 @@ main {
   font-size: 18px;
   font-weight: 300;
   color: var(--dim);
-  margin-top: 0.25rem;
+  margin: 0.25rem 0 0;
 }
 
 /* Social links */
@@ -99,6 +99,33 @@ main {
 .social-links .btn:hover {
   color: var(--green);
   transform: translateY(-2px);
+}
+
+/* Header top (title + lang switcher) */
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.lang-switcher {
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.lang-link {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--dim);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+}
+
+.lang-link:hover {
+  color: var(--green);
 }
 
 /* Site nav */
@@ -135,7 +162,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 { font-size: 30px; }
-h2 { font-size: 24px; }
+h2 { font-size: 24px; margin-top: 2.5rem; }
 h3 { font-size: 18px; }
 
 /* Content */
