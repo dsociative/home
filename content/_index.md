@@ -1,6 +1,6 @@
 ---
 title: "Artem Prikhodin"
-description: "Backend developer. Rust, Go, Python. 15+ years of experience."
+description: "Backend Developer — Rust, Go, Python. 15+ years building high-load systems."
 ---
 
 ## About

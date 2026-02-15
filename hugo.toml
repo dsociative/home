@@ -1,20 +1,16 @@
 baseURL = "https://geektech.ru/"
 languageCode = "en"
-title = "geektech"
+title = "Artem Prikhodin"
 
 [params]
   author = "Artem Prikhodin"
-  description = "Backend developer. Rust, Go, Python. 15+ years of experience."
+  description = "Backend Developer — Rust, Go, Python. 15+ years building high-load systems."
   keywords = ["Python", "Developer", "Backend", "Artem Prikhodin"]
   github = "https://github.com/dsociative"
   linkedin = "https://www.linkedin.com/in/artem-prikhodin-ba769237"
   telegram = "https://t.me/dsociative"
 
 [menu]
-  [[menu.main]]
-    name = "Home"
-    url = "/"
-    weight = 1
 
 [markup.goldmark.renderer]
   unsafe = true
