@@ -187,6 +187,146 @@
   --em-color: #d3869b;
 }
 
+/* === Chroma syntax highlighting (dark: gruvbox) === */
+
+[data-theme="dark"] .chroma { color: #ebdbb2; background: var(--pre-bg); }
+[data-theme="dark"] .chroma .hl { background-color: #3d3d3d; }
+[data-theme="dark"] .chroma .lnt,
+[data-theme="dark"] .chroma .ln { color: #756d59; }
+[data-theme="dark"] .chroma .k,
+[data-theme="dark"] .chroma .kc,
+[data-theme="dark"] .chroma .kd,
+[data-theme="dark"] .chroma .kn,
+[data-theme="dark"] .chroma .kp,
+[data-theme="dark"] .chroma .kr { color: #fe8019; }
+[data-theme="dark"] .chroma .kt { color: #fabd2f; }
+[data-theme="dark"] .chroma .na { color: #b8bb26; font-weight: bold; }
+[data-theme="dark"] .chroma .nb,
+[data-theme="dark"] .chroma .bp,
+[data-theme="dark"] .chroma .nf,
+[data-theme="dark"] .chroma .fm,
+[data-theme="dark"] .chroma .ni { color: #fabd2f; }
+[data-theme="dark"] .chroma .no { color: #d3869b; }
+[data-theme="dark"] .chroma .ne,
+[data-theme="dark"] .chroma .nl,
+[data-theme="dark"] .chroma .nt { color: #fb4934; }
+[data-theme="dark"] .chroma .s,
+[data-theme="dark"] .chroma .sa,
+[data-theme="dark"] .chroma .sb,
+[data-theme="dark"] .chroma .sc,
+[data-theme="dark"] .chroma .dl,
+[data-theme="dark"] .chroma .sd,
+[data-theme="dark"] .chroma .s2,
+[data-theme="dark"] .chroma .se,
+[data-theme="dark"] .chroma .sh,
+[data-theme="dark"] .chroma .si,
+[data-theme="dark"] .chroma .sx,
+[data-theme="dark"] .chroma .sr,
+[data-theme="dark"] .chroma .s1 { color: #b8bb26; }
+[data-theme="dark"] .chroma .ss { color: #83a598; }
+[data-theme="dark"] .chroma .m,
+[data-theme="dark"] .chroma .mb,
+[data-theme="dark"] .chroma .mf,
+[data-theme="dark"] .chroma .mh,
+[data-theme="dark"] .chroma .mi,
+[data-theme="dark"] .chroma .il,
+[data-theme="dark"] .chroma .mo { color: #d3869b; }
+[data-theme="dark"] .chroma .o,
+[data-theme="dark"] .chroma .ow { color: #fe8019; }
+[data-theme="dark"] .chroma .c,
+[data-theme="dark"] .chroma .ch,
+[data-theme="dark"] .chroma .cm,
+[data-theme="dark"] .chroma .c1,
+[data-theme="dark"] .chroma .cs { color: #928374; font-style: italic; }
+[data-theme="dark"] .chroma .cp,
+[data-theme="dark"] .chroma .cpf { color: #8ec07c; }
+[data-theme="dark"] .chroma .gd { color: #282828; background-color: #fb4934; }
+[data-theme="dark"] .chroma .gi { color: #282828; background-color: #b8bb26; }
+[data-theme="dark"] .chroma .ge { color: #83a598; text-decoration: underline; }
+[data-theme="dark"] .chroma .gh,
+[data-theme="dark"] .chroma .gu { color: #b8bb26; font-weight: bold; }
+
+/* === Chroma syntax highlighting (light: flatwhite) === */
+
+[data-theme="light"] .chroma { color: #605a52; background: var(--pre-bg); }
+[data-theme="light"] .chroma .hl { background-color: #e4ddd2; }
+[data-theme="light"] .chroma .lnt,
+[data-theme="light"] .chroma .ln { color: #b9a992; }
+[data-theme="light"] .chroma .k,
+[data-theme="light"] .chroma .kc,
+[data-theme="light"] .chroma .kd,
+[data-theme="light"] .chroma .kn,
+[data-theme="light"] .chroma .kp,
+[data-theme="light"] .chroma .kr { color: #9a3d7a; }
+[data-theme="light"] .chroma .kt { color: #7b59a0; }
+[data-theme="light"] .chroma .na { color: #5a7a20; font-weight: bold; }
+[data-theme="light"] .chroma .nb,
+[data-theme="light"] .chroma .bp { color: #7b59a0; }
+[data-theme="light"] .chroma .nf,
+[data-theme="light"] .chroma .fm { color: #3568b8; }
+[data-theme="light"] .chroma .ni { color: #b07800; }
+[data-theme="light"] .chroma .no { color: #b07800; }
+[data-theme="light"] .chroma .ne,
+[data-theme="light"] .chroma .nl,
+[data-theme="light"] .chroma .nt { color: #b34040; }
+[data-theme="light"] .chroma .s,
+[data-theme="light"] .chroma .sa,
+[data-theme="light"] .chroma .sb,
+[data-theme="light"] .chroma .sc,
+[data-theme="light"] .chroma .dl,
+[data-theme="light"] .chroma .sd,
+[data-theme="light"] .chroma .s2,
+[data-theme="light"] .chroma .se,
+[data-theme="light"] .chroma .sh,
+[data-theme="light"] .chroma .si,
+[data-theme="light"] .chroma .sx,
+[data-theme="light"] .chroma .sr,
+[data-theme="light"] .chroma .s1 { color: #5a7a20; }
+[data-theme="light"] .chroma .ss { color: #1a8a6a; }
+[data-theme="light"] .chroma .m,
+[data-theme="light"] .chroma .mb,
+[data-theme="light"] .chroma .mf,
+[data-theme="light"] .chroma .mh,
+[data-theme="light"] .chroma .mi,
+[data-theme="light"] .chroma .il,
+[data-theme="light"] .chroma .mo { color: #3568b8; }
+[data-theme="light"] .chroma .o,
+[data-theme="light"] .chroma .ow { color: #b07800; }
+[data-theme="light"] .chroma .c,
+[data-theme="light"] .chroma .ch,
+[data-theme="light"] .chroma .cm,
+[data-theme="light"] .chroma .c1,
+[data-theme="light"] .chroma .cs { color: #93836c; font-style: italic; }
+[data-theme="light"] .chroma .cp,
+[data-theme="light"] .chroma .cpf { color: #1a8a6a; }
+[data-theme="light"] .chroma .gd { color: #b34040; background-color: #f6cfcb; }
+[data-theme="light"] .chroma .gi { color: #5a7a20; background-color: #e2e9c1; }
+[data-theme="light"] .chroma .ge { color: #3568b8; text-decoration: underline; }
+[data-theme="light"] .chroma .gh,
+[data-theme="light"] .chroma .gu { color: #9a3d7a; font-weight: bold; }
+
+/* === highlight.js — TLA+ only === */
+
+[data-theme="dark"] .hljs-keyword  { color: #fabd2f; }
+[data-theme="dark"] .hljs-literal  { color: #fe8019; }
+[data-theme="dark"] .hljs-built_in { color: #8ec07c; }
+[data-theme="dark"] .hljs-string   { color: #b8bb26; }
+[data-theme="dark"] .hljs-number   { color: #d3869b; }
+[data-theme="dark"] .hljs-comment  { color: #928374; font-style: italic; }
+[data-theme="dark"] .hljs-operator { color: #fe8019; }
+[data-theme="dark"] .hljs-title    { color: #83a598; }
+[data-theme="dark"] .hljs-punctuation { color: #928374; }
+
+[data-theme="light"] .hljs-keyword  { color: #9a3d7a; }
+[data-theme="light"] .hljs-literal  { color: #b07800; }
+[data-theme="light"] .hljs-built_in { color: #1a8a6a; }
+[data-theme="light"] .hljs-string   { color: #5a7a20; }
+[data-theme="light"] .hljs-number   { color: #3568b8; }
+[data-theme="light"] .hljs-comment  { color: #93836c; font-style: italic; }
+[data-theme="light"] .hljs-operator { color: #b07800; }
+[data-theme="light"] .hljs-title    { color: #3568b8; }
+[data-theme="light"] .hljs-punctuation { color: #93836c; }
+
 /* === Reset === */
 
 *, *::before, *::after {

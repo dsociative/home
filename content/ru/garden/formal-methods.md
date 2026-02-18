@@ -500,7 +500,7 @@ Lean 4 создан Леонардо де Моура (Microsoft Research, сей
 
 TLA+ основан на математической нотации: теория множеств, логика первого порядка, темпоральная логика. Выглядит как математика, а не как код:
 
-```text
+```tlaplus
 Init == counter = 0
 
 Next == counter' = counter + 1
@@ -512,7 +512,7 @@ TypeOK == counter \in Nat
 
 PlusCal — псевдокодовый слой поверх TLA+, ближе к привычному программированию:
 
-```text
+```tlaplus
 --algorithm counter
 variables counter = 0;
 begin
@@ -527,7 +527,7 @@ end algorithm;
 
 Lean 4 — полноценный функциональный язык с синтаксисом, напоминающим Haskell/ML, плюс тактический язык для доказательств:
 
-```text
+```lean
 def factorial : Nat → Nat
   | 0     => 1
   | n + 1 => (n + 1) * factorial n

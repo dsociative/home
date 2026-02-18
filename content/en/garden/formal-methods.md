@@ -4,7 +4,7 @@ date = 2026-02-18
 lastmod = 2026-02-18
 tags = ["formal-methods", "tla+", "lean4", "alloy", "stateright", "learning", "industry", "verification"]
 draft = false
-sourceHash = "de36a532aeb109880733d4693c2e683b"
+sourceHash = "090657221fc723299796224c67f2cc7b"
 description = "Formal software verification methods — history, tools (TLA+, Alloy, SPIN, Dafny, Lean 4), use cases at AWS, Intel, Airbus, seL4, and limitations. A guide to learning TLA+. Detailed TLA+ vs Lean 4 comparison."
 +++
 
@@ -502,7 +502,7 @@ The key difference: TLA+ works with **finite models** of the system — the mode
 
 TLA+ is based on mathematical notation: set theory, first-order logic, temporal logic. It looks like mathematics, not code:
 
-```text
+```tlaplus
 Init == counter = 0
 
 Next == counter' = counter + 1
@@ -514,7 +514,7 @@ TypeOK == counter \in Nat
 
 PlusCal — a pseudocode layer on top of TLA+, closer to conventional programming:
 
-```text
+```tlaplus
 --algorithm counter
 variables counter = 0;
 begin
@@ -529,7 +529,7 @@ end algorithm;
 
 Lean 4 is a full-fledged functional language with Haskell/ML-like syntax, plus a tactic language for proofs:
 
-```text
+```lean
 def factorial : Nat → Nat
   | 0     => 1
   | n + 1 => (n + 1) * factorial n

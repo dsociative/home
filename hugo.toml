@@ -52,6 +52,9 @@ defaultContentLanguageInSubdir = true
 [markup.goldmark.renderer]
   unsafe = true
 
+[markup.highlight]
+  noClasses = false
+
 enableRobotsTXT = true
 
 [sitemap]
