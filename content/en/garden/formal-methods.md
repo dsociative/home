@@ -2,9 +2,10 @@
 title = "Formal Methods"
 date = 2026-02-18
 lastmod = 2026-02-18
-tags = ["formal-methods", "tla+", "alloy", "stateright", "learning", "industry", "verification"]
+tags = ["formal-methods", "tla+", "lean4", "alloy", "stateright", "learning", "industry", "verification"]
 draft = false
-description = "Formal software verification methods — history, tools (TLA+, Alloy, SPIN, Dafny, Lean 4), use cases at AWS, Intel, Airbus, seL4, and limitations. A guide to learning TLA+."
+sourceHash = "de36a532aeb109880733d4693c2e683b"
+description = "Formal software verification methods — history, tools (TLA+, Alloy, SPIN, Dafny, Lean 4), use cases at AWS, Intel, Airbus, seL4, and limitations. A guide to learning TLA+. Detailed TLA+ vs Lean 4 comparison."
 +++
 
 ## What are formal methods {#what-are-formal-methods}
@@ -456,3 +457,291 @@ Built into the TLA+ VS Code extension. Allows exploring the state graph after ru
 -   Safety: all participants reach the same decision (commit or abort)
 -   Model participant failures
 -   Verify that 2PC blocks on coordinator failure (a known limitation)
+
+
+## TLA+ vs Lean 4: detailed comparison {#tla-plus-vs-lean-4-detailed-comparison}
+
+Both tools belong to formal methods, but they solve **fundamentally different problems**. TLA+ is a system specification language with model checking. Lean 4 is a theorem prover and functional programming language with dependent types. The comparison below focuses on practical differences for a backend developer working with distributed and high-load systems.
+
+
+### Philosophy and purpose {#philosophy-and-purpose}
+
+
+#### TLA+: "What should the system do?" {#tla-plus-what-should-the-system-do}
+
+TLA+ (Temporal Logic of Actions) was created by Leslie Lamport for **specifying the behavior** of concurrent and distributed systems. The philosophy: before writing code, you need to precisely describe **what** the system does — at a level of abstraction above the code. TLA+ does not write or verify code — it verifies the **design**.
+
+The central idea: a system is a set of admissible behaviors (sequences of states). The specification defines which behaviors are admissible, and the model checker (TLC) exhaustively checks all reachable states for violations of given properties ([TLA+ in Practice and Theory](https://pron.github.io/posts/tlaplus_part1)).
+
+
+#### Lean 4: "Can we prove this?" {#lean-4-can-we-prove-this}
+
+Lean 4 was created by Leonardo de Moura (Microsoft Research, now Lean FRO) as an **interactive theorem prover** and simultaneously a **functional programming language**. The philosophy: code, specification, and proof live in the same file and are checked by the same compiler ([lean-lang.org](https://lean-lang.org/)).
+
+The central idea: dependent types allow types to depend on values. If the type `Vector n α` is a vector of length `n`, then the function `head : Vector (n+1) α → α` **will not compile** for an empty vector — this is proved **at the type level**. Lean eliminates entire classes of errors (buffer overflow, integer wrap-around) at compile time.
+
+
+### Specification vs Verification {#specification-vs-verification}
+
+| Aspect              | TLA+                                                     | Lean 4                                                    |
+|---------------------|----------------------------------------------------------|-----------------------------------------------------------|
+| **Goal**            | Specification and design verification                    | Proving code/theorem properties                           |
+| **Object of verification** | System model (separate from code)               | The code itself or mathematical statements                |
+| **Verification method** | Model checking (state enumeration)                  | Interactive proof (proof assistant)                        |
+| **Completeness**    | Checks **all** states within a finite model              | Proves properties for **all** inputs (universally)        |
+| **What it finds**   | A specific counterexample (error trace)                  | Either a proof or inability to construct one               |
+| **Limitations**     | State explosion on large models                          | Requires manual proof writing                             |
+
+The key difference: TLA+ works with **finite models** of the system — the model checker enumerates all reachable states and looks for invariant violations. If there are too many states (state explosion), the model needs to be simplified. Lean 4 **proves** properties for arbitrary inputs — there is no finiteness limitation, but a proof must be constructed manually (or semi-automatically).
+
+
+### Language and syntax {#language-and-syntax}
+
+
+#### TLA+ {#tla-plus}
+
+TLA+ is based on mathematical notation: set theory, first-order logic, temporal logic. It looks like mathematics, not code:
+
+```text
+Init == counter = 0
+
+Next == counter' = counter + 1
+
+Spec == Init /\ [][Next]_counter /\ WF_counter(Next)
+
+TypeOK == counter \in Nat
+```
+
+PlusCal — a pseudocode layer on top of TLA+, closer to conventional programming:
+
+```text
+--algorithm counter
+variables counter = 0;
+begin
+  while counter < N do
+    counter := counter + 1;
+  end while;
+end algorithm;
+```
+
+
+#### Lean 4 {#lean-4}
+
+Lean 4 is a full-fledged functional language with Haskell/ML-like syntax, plus a tactic language for proofs:
+
+```text
+def factorial : Nat → Nat
+  | 0     => 1
+  | n + 1 => (n + 1) * factorial n
+
+theorem factorial_pos : ∀ n : Nat, 0 < factorial n := by
+  intro n
+  induction n with
+  | zero => simp [factorial]
+  | succ n ih => simp [factorial]; omega
+```
+
+Lean's syntax is closer to conventional programming than TLA+, but proof constructs (tactics `by`, `simp`, `omega`, `induction`) are a separate skill to learn.
+
+
+### What exactly they verify {#what-exactly-they-verify}
+
+
+#### TLA+: protocols and system design {#tla-plus-protocols-and-system-design}
+
+-   **Safety**: "nothing bad happens" — invariants, absence of deadlocks
+-   **Liveness**: "something good eventually happens" — progress, absence of livelock
+-   **Distributed protocols**: Raft, Paxos, 2PC, chain replication
+-   **Concurrent algorithms**: lock-free structures, scheduling, producer-consumer
+
+Specific example: AWS verified DynamoDB algorithms (939 lines of TLA+), S3 fault-tolerance, EBS volume management. A DynamoDB bug was found with an error trace of 35 steps — impossible to discover manually ([Use of Formal Methods at Amazon Web Services](https://lamport.azurewebsites.net/tla/formal-methods-amazon.pdf)).
+
+Azure Cosmos DB: all [5 consistency levels](https://github.com/Azure/azure-cosmos-tla) specified and verified in TLA+.
+
+Raft (used in etcd, CockroachDB, TiKV): formal specification in TLA+ — ~400 lines, serves as the canonical description of the algorithm ([raft.github.io](https://raft.github.io/)).
+
+
+#### Lean 4: mathematical proofs and code correctness {#lean-4-mathematical-proofs-and-code-correctness}
+
+-   **Mathematical theorems**: Mathlib contains 210,000+ formalized theorems (as of April 2025)
+-   **Code correctness**: proving that a function conforms to its specification
+-   **Type safety**: eliminating classes of errors through dependent types
+-   **Authorization policies**: Amazon Cedar — an authorization language whose core is verified in Lean 4
+
+Specific example: [Cedar](https://lean-lang.org/use-cases/cedar/) — an open-source authorization language underlying Amazon Verified Permissions and AWS Verified Access. AWS created a formal model of Cedar in Lean 4 and proved key correctness and safety properties. Cedar's symbolic compiler is implemented in Lean and ships with soundness and completeness proofs ([AWS: Lean Into Verified Software Development](https://aws.amazon.com/blogs/opensource/lean-into-verified-software-development/)).
+
+
+### Ecosystem and tools {#ecosystem-and-tools}
+
+
+#### TLA+ {#tla-plus}
+
+| Tool                  | Purpose                                                                                                                      |
+|-----------------------|------------------------------------------------------------------------------------------------------------------------------|
+| **TLC**               | Explicit-state model checker (primary). Enumerates all states, finds counterexamples                                         |
+| **Apalache**          | Symbolic model checker (SMT-based). Handles large state spaces via Z3 ([apalache-mc.org](https://apalache-mc.org/))          |
+| **TLAPS**             | Proof system. Delegates proofs to Isabelle, Zenon, Z3 ([proofs.tlapl.us](https://proofs.tlapl.us/))                          |
+| **VS Code extension** | IDE with Model Context Protocol support, TLC statistics visualization                                                         |
+| **Quint**             | Modern syntax over TLA logic with typing and REPL ([quint](https://github.com/informalsystems/quint))                        |
+| **Spectacle**         | Browser-based model checker with state graph visualization                                                                    |
+
+Tool limitations:
+
+-   TLC: does not support liveness in distributed mode, not all temporal operators
+-   TLAPS: does not support reasoning with real numbers and most temporal operators
+-   Apalache: development slowed after spinning off from Informal Systems (late 2024)
+
+
+#### Lean 4 {#lean-4}
+
+| Tool                   | Purpose                                                                     |
+|------------------------|-----------------------------------------------------------------------------|
+| **Lean compiler**      | Compiles Lean to native code via C backend                                   |
+| **Lake**               | Build system (similar to Cargo for Rust)                                     |
+| **Mathlib**            | Largest mathematical library: 210,000+ theorems, 100,000+ definitions       |
+| **VS Code extension**  | IDE with highlighting, goal view, tactic mode                                |
+| **Lean4Lean**          | Self-verification: Lean's type checker written and verified in Lean          |
+| **DeepSeek-Prover-V2** | AI for automatic theorem proving in Lean 4 (April 2025)                      |
+
+Lean FRO Roadmap (Year 3, August 2025 — July 2026) ([roadmap](https://lean-lang.org/fro/roadmap/y3/)):
+
+-   Standard library (Std) 1.0 with async/await, networking, HTTP server
+-   New do-notation integrated with verification workflow
+-   Tactic caching for faster iterative proof development
+
+
+### Learning curve {#learning-curve}
+
+
+#### TLA+: 2–3 weeks to productivity {#tla-plus-2-3-weeks-to-productivity}
+
+Based on AWS experience ([Newcombe et al.](https://lamport.azurewebsites.net/tla/formal-methods-amazon.pdf)):
+
+-   Engineers learn TLA+ in **2–3 weeks** and start finding bugs
+-   PlusCal lowers the entry barrier — syntax closer to pseudocode
+-   In workshops, participants find real bugs by **day three**
+-   The main difficulty is not syntax but **state-based thinking**: learning to think about a system as a set of admissible behaviors
+
+Resources: [Lamport's video course](http://lamport.azurewebsites.net/video/videos.html), [learntla.com](https://learntla.com/), [Practical TLA+](https://link.springer.com/book/10.1007/978-1-4842-3829-5).
+
+
+#### Lean 4: months, requires mathematical background {#lean-4-months-requires-mathematical-background}
+
+Based on community feedback ([Learning Lean 4](https://leanprover-community.github.io/learn.html)):
+
+-   "Learning Lean is hard and sometimes frustrating" — official documentation
+-   Proof assistants — "you can't expect to be productive after one day"
+-   Requires understanding of dependent types, tactics, functional programming
+-   For mathematical proofs: **mathematical maturity** is needed (induction, logic, type theory)
+-   For software verification: understanding of pre/postconditions, invariants, refinement is needed
+
+Resources: [Theorem Proving in Lean 4](https://leanprover.github.io/theorem_proving_in_lean4/) (TPIL), [Functional Programming in Lean](https://lean-lang.org/functional_programming_in_lean/) (FPIL).
+
+
+#### Learning curve comparison {#learning-curve-comparison}
+
+| Aspect                                | TLA+                    | Lean 4                             |
+|---------------------------------------|-------------------------|------------------------------------|
+| Time to first result                  | Days (PlusCal)          | Weeks                              |
+| Time to productivity                  | 2–3 weeks               | Months                             |
+| Required background                   | Logic, set theory       | FP, dependent types, tactics       |
+| Main difficulty                       | State-based thinking    | Writing proofs                     |
+| Usefulness without deep understanding | High (PlusCal + TLC)    | Low                                |
+
+
+### Industry adoption {#industry-adoption}
+
+
+#### TLA+: the standard for distributed systems {#tla-plus-the-standard-for-distributed-systems}
+
+-   **Amazon AWS**: S3, DynamoDB, EBS, internal distributed lock manager — 7+ teams, 10+ systems ([Systems Correctness Practices at AWS, CACM 2024](https://cacm.acm.org/practice/systems-correctness-practices-at-amazon-web-services/))
+-   **Microsoft Azure**: Cosmos DB — [all 5 consistency levels](https://github.com/Azure/azure-cosmos-tla) verified in TLA+
+-   **Alibaba Cloud**: formal verification of distributed algorithms ([Alibaba TLA+ Introduction](https://www.alibabacloud.com/blog/formal-verification-tool-tla%2B-an-introduction-from-the-perspective-of-a-programmer_598373))
+-   **Datadog**: formal modeling of distributed systems ([Datadog Engineering](https://www.datadoghq.com/blog/engineering/formal-modeling-and-simulation/))
+-   **Protocols**: Raft (etcd, CockroachDB, TiKV), Paxos and their variations have canonical TLA+ specifications
+-   **Academia**: TLA+ is the standard for publishing new distributed algorithms; papers without a TLA+ specification are harder to get accepted
+
+
+#### Lean 4: mathematics, AI, and verified software {#lean-4-mathematics-ai-and-verified-software}
+
+-   **Amazon**: Cedar — a verified authorization language for AWS Verified Permissions and Verified Access ([Cedar case study](https://lean-lang.org/use-cases/cedar/))
+-   **Google DeepMind**: AlphaProof — AI for proving mathematical theorems, silver medal level at IMO ([VentureBeat](https://venturebeat.com/ai/lean4-how-the-theorem-prover-works-and-why-its-the-new-competitive-edge-in))
+-   **Harmonic AI**: $100M+ funding (2025) — "hallucination-free" AI based on Lean 4
+-   **Mathlib**: the world's largest formalized mathematical library — 210,000+ theorems
+-   **ACM SIGPLAN Award 2025**: Lean recognized for "significant impact on mathematics, software verification, and AI"
+
+
+### When to choose which {#when-to-choose-which}
+
+
+#### Choose TLA+ when: {#choose-tla-plus-when}
+
+-   **Designing a distributed protocol** — consensus, replication, sharding, failover
+-   **Need to verify the design before writing code** — finding bugs at the architecture level
+-   **Working with concurrency** — lock-free algorithms, message passing, race conditions
+-   **Team of backend developers** — learning curve is realistic (2–3 weeks)
+-   **Limited time** — TLC delivers results quickly, no need to write proofs
+-   **Need a specific counterexample** — TLC shows an exact error trace
+
+
+#### Choose Lean 4 when: {#choose-lean-4-when}
+
+-   **Need to prove algorithm correctness** for arbitrary inputs (not a bounded model)
+-   **Verifying critical code** — authorization, cryptography, parsers
+-   **Code and specification should live together** — no gap between model and implementation
+-   **Working with mathematical properties** — correctness of optimizations, theoretical guarantees
+-   **Building a verifiable DSL** — like Cedar (specification + implementation + proof)
+-   **Ready to invest months** in learning and writing proofs
+
+
+### Can they complement each other? {#can-they-complement-each-other}
+
+Yes. TLA+ and Lean 4 operate at **different levels of abstraction** and solve **different problems** — they are not competitors but complementary tools.
+
+A typical workflow for a distributed system:
+
+1.  **TLA+: design verification** — specify the protocol, check safety/liveness via TLC. Find and fix architectural bugs in days, before writing code
+2.  **Lean 4: verification of critical components** — for the most sensitive modules (authorization, serialization, cryptographic primitives) write a verified implementation in Lean with correctness proofs
+3.  **Testing + monitoring** — for the rest of the code: property-based testing, fuzzing, runtime validation
+
+Example from AWS practice:
+
+-   **TLA+** is used to verify S3 and DynamoDB protocols (design)
+-   **Lean 4** is used to verify Cedar (authorization implementation)
+-   **P** is used for state-machine modeling with code generation
+
+Three different tools for three different problems at one company.
+
+
+### Summary: key differences in one table {#summary-key-differences-in-one-table}
+
+| Criterion              | TLA+                                       | Lean 4                                               |
+|------------------------|--------------------------------------------|------------------------------------------------------|
+| **Creator**            | Leslie Lamport (Turing Award 2013)         | Leonardo de Moura (Lean FRO, ex-Microsoft Research)  |
+| **Year created**       | 1999                                       | 2013 (Lean 1), 2021 (Lean 4)                         |
+| **Tool type**          | Specification language + model checker     | Theorem prover + programming language                |
+| **Foundation**         | Temporal Logic of Actions (TLA)            | Dependent types (Calculus of Constructions)           |
+| **What it checks**     | Design/protocols (safety, liveness)        | Code/theorems (correctness, type safety)             |
+| **Verification method**| Automatic (TLC enumerates states)          | Semi-automatic (tactics + manual proofs)             |
+| **Relation to code**   | Model is separate from code (verification gap) | Code and proof are one                          |
+| **Learning curve**     | 2–3 weeks                                  | Months                                               |
+| **Primary audience**   | Backend/infra engineers                    | Mathematicians, researchers, security engineers      |
+| **Main strength**      | Quickly finds bugs in design               | Provides mathematical guarantees of correctness      |
+| **Main weakness**      | Does not verify code                       | High entry barrier                                   |
+
+
+### Practical recommendation for a backend developer {#practical-recommendation-for-a-backend-developer}
+
+For an engineer working with distributed and high-load systems, **TLA+ is the first tool to learn**. Reasons:
+
+1.  **Direct fit for the job** — TLA+ was created specifically for specifying concurrent and distributed protocols
+2.  **Fast ROI** — productivity in 2–3 weeks; you can verify current work tasks
+3.  **Industry standard** — AWS, Azure, Alibaba, Datadog use TLA+ in production
+4.  **Automation** — TLC model checker works without writing proofs
+
+Lean 4 is worth learning **after** TLA+ if:
+
+-   You need to verify specific code (not design)
+-   You work with authorization, cryptography, safety-critical components
+-   You're interested in formal mathematics or AI for proofs
+-   You're ready for significant time investment (months)
