@@ -26,12 +26,28 @@ defaultContentLanguageInSubdir = true
 
 [params]
   author = "Artem Prikhodin"
+  images = ["images/og-default.png"]
 
   github = "https://github.com/dsociative"
   linkedin = "https://www.linkedin.com/in/artem-prikhodin-ba769237"
   telegram = "https://t.me/dsociative"
 
-[menu]
+[taxonomies]
+  tag = "tags"
+
+[languages.en.menu]
+  [[languages.en.menu.main]]
+    identifier = "garden"
+    name = "Garden"
+    url = "/en/garden/"
+    weight = 10
+
+[languages.ru.menu]
+  [[languages.ru.menu.main]]
+    identifier = "garden"
+    name = "Garden"
+    url = "/ru/garden/"
+    weight = 10
 
 [markup.goldmark.renderer]
   unsafe = true

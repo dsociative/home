@@ -9,13 +9,28 @@
 <meta property="og:url" content="{{ .Permalink }}">
 <meta property="og:locale" content="{{ .Site.Language.Lang }}">
 <meta property="og:site_name" content="{{ .Site.Title }}">
+{{- $image := "" }}
+{{- with .Params.images }}{{ $image = index . 0 }}{{ else }}{{ with .Site.Params.images }}{{ $image = index . 0 }}{{ end }}{{ end }}
+{{- with $image }}
+<meta property="og:image" content="{{ . | absURL }}">
+<meta name="twitter:image" content="{{ . | absURL }}">
+<meta name="twitter:card" content="summary_large_image">
+{{- else }}
 <meta name="twitter:card" content="summary">
+{{- end }}
 <meta name="twitter:title" content="{{ if not .IsHome }}{{ .Title }} | {{ end }}{{ .Site.Title }}">
 <meta name="twitter:description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
 {{ range .Translations }}
 <link rel="alternate" hreflang="{{ .Language.Lang }}" href="{{ .Permalink }}">
 {{ end }}
 <link rel="alternate" hreflang="{{ .Site.Language.Lang }}" href="{{ .Permalink }}">
+{{- if eq .Site.Language.Lang "en" }}
+<link rel="alternate" hreflang="x-default" href="{{ .Permalink }}">
+{{- else }}
+  {{- range .Translations }}{{ if eq .Language.Lang "en" }}
+<link rel="alternate" hreflang="x-default" href="{{ .Permalink }}">
+  {{- end }}{{ end }}
+{{- end }}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/fonts/zed-mono-extended.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/zed-mono-extendedbold.woff2" as="font" type="font/woff2" crossorigin>
@@ -30,3 +45,4 @@
 <title>{{ if not .IsHome }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
 {{ $style := resources.Get "css/style.css" }}
 <link rel="stylesheet" href="{{ $style.RelPermalink }}">
+{{- partial "jsonld.html" . -}}
