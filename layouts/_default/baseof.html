@@ -61,6 +61,31 @@
     window.addEventListener('scroll', updateScroll, { passive: true });
     updateScroll();
 
+    // Code copy buttons
+    var highlights = document.querySelectorAll('.post-content .highlight');
+    for (var i = 0; i < highlights.length; i++) {
+      (function(hl) {
+        var btn = document.createElement('button');
+        btn.className = 'code-copy';
+        btn.textContent = 'copy';
+        btn.setAttribute('aria-label', 'Copy code');
+        btn.addEventListener('click', function() {
+          var code = hl.querySelector('code');
+          if (code) {
+            navigator.clipboard.writeText(code.textContent).then(function() {
+              btn.textContent = 'ok';
+              btn.classList.add('copied');
+              setTimeout(function() {
+                btn.textContent = 'copy';
+                btn.classList.remove('copied');
+              }, 1500);
+            });
+          }
+        });
+        hl.appendChild(btn);
+      })(highlights[i]);
+    }
+
     // Heading anchor links
     var headings = document.querySelectorAll('.post-content h2[id], .post-content h3[id]');
     for (var i = 0; i < headings.length; i++) {
@@ -70,6 +95,101 @@
       a.textContent = '\u00B6';
       a.setAttribute('aria-label', 'Link to section');
       headings[i].appendChild(a);
+    }
+
+    // TOC tree markers
+    var tocTree = document.getElementById('toc-tree');
+    var tocSidebar = document.getElementById('toc-sidebar');
+    if (tocTree) {
+      var topUl = tocTree.querySelector('nav > ul');
+      if (topUl) {
+        for (var j = 0; j < topUl.children.length; j++) {
+          var li = topUl.children[j];
+          if (li.tagName !== 'LI') continue;
+          var hasChildren = li.querySelector('ul');
+          if (hasChildren) {
+            var marker = document.createElement('span');
+            marker.className = 'tree-marker';
+            marker.textContent = '+';
+            li.insertBefore(marker, li.firstChild);
+          }
+        }
+      }
+    }
+
+    // Sidebar: toggle + dynamic top + scroll spy
+    if (tocSidebar && tocTree) {
+      var siteHeader = document.querySelector('.site-header');
+      var topTocUl = tocTree.querySelector('nav > ul');
+      var tocToggle = document.getElementById('toc-toggle');
+
+      function updateToggleIcon() {
+        var isCollapsed = tocSidebar.classList.contains('collapsed');
+        tocToggle.textContent = isCollapsed ? '\u00AB' : '\u00BB';
+      }
+
+      // Restore collapsed state
+      if (localStorage.getItem('toc-collapsed') === '1') {
+        tocSidebar.classList.add('collapsed');
+      }
+      updateToggleIcon();
+
+      tocToggle.addEventListener('click', function() {
+        tocSidebar.classList.toggle('collapsed');
+        updateToggleIcon();
+        localStorage.setItem('toc-collapsed', tocSidebar.classList.contains('collapsed') ? '1' : '0');
+      });
+
+      // Match headings to TOC links by document order (avoids duplicate ID issues)
+      var contentHeadings = document.querySelectorAll('.post-content h2[id], .post-content h3[id]');
+      var tocLinks = tocTree.querySelectorAll('a');
+      var tocItems = [];
+      var count = Math.min(contentHeadings.length, tocLinks.length);
+      for (var ti = 0; ti < count; ti++) {
+        tocItems.push({ el: contentHeadings[ti], link: tocLinks[ti] });
+      }
+
+      function updateSidebar() {
+        // Position below header
+        if (siteHeader) {
+          var hBottom = siteHeader.getBoundingClientRect().bottom;
+          tocSidebar.style.top = Math.max(hBottom + 16, 32) + 'px';
+        }
+
+        // Scroll spy — find last heading above viewport threshold
+        var active = null;
+        for (var i = 0; i < tocItems.length; i++) {
+          if (tocItems[i].el.getBoundingClientRect().top <= 80) {
+            active = tocItems[i];
+          }
+        }
+
+        // Clear previous state
+        var prev = tocTree.querySelectorAll('.toc-active');
+        for (var j = 0; j < prev.length; j++) prev[j].classList.remove('toc-active');
+        var oldExpanded = tocTree.querySelectorAll('.toc-expand');
+        for (var j = 0; j < oldExpanded.length; j++) {
+          oldExpanded[j].classList.remove('toc-expand');
+          var m = oldExpanded[j].querySelector(':scope > .tree-marker');
+          if (m) m.textContent = '+';
+        }
+
+        if (active) {
+          active.link.classList.add('toc-active');
+          // Find h2-level li and expand
+          var li = active.link.parentElement;
+          var h2Li = li;
+          if (topTocUl && li.parentElement && li.parentElement.tagName === 'UL' && li.parentElement.parentElement && li.parentElement.parentElement.tagName === 'LI') {
+            h2Li = li.parentElement.parentElement;
+          }
+          h2Li.classList.add('toc-expand');
+          var m2 = h2Li.querySelector(':scope > .tree-marker');
+          if (m2) m2.textContent = '-';
+        }
+      }
+
+      window.addEventListener('scroll', updateSidebar, { passive: true });
+      updateSidebar();
     }
   })();
   </script>

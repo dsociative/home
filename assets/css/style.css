@@ -344,6 +344,8 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  scroll-padding-top: 2rem;
 }
 
 body {
@@ -586,6 +588,20 @@ ul li::before {
   width: 1.25em;
 }
 
+ol {
+  padding-left: 2em;
+}
+
+ol li {
+  line-height: 1.5;
+  margin-bottom: 0.2rem;
+}
+
+ol li::marker {
+  color: var(--marker-color);
+  font-size: 0.875rem;
+}
+
 /* === Links === */
 
 a {
@@ -629,9 +645,24 @@ a:hover {
   margin-bottom: 1.5rem;
 }
 
-.post-header time {
-  color: var(--time-color);
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
   font-size: 0.875rem;
+  color: var(--fg-dim);
+}
+
+.post-meta time {
+  color: var(--time-color);
+}
+
+.post-updated {
+  color: var(--fg-dim);
+}
+
+.post-reading-time {
+  color: var(--fg-faint);
 }
 
 .post-content {
@@ -644,10 +675,36 @@ a:hover {
 
 /* === Code === */
 
-.post-content .highlight {
-  width: fit-content;
-  min-width: 100%;
-  max-width: calc(100vw - 2rem);
+.highlight {
+  position: relative;
+}
+
+.code-copy {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.highlight:hover .code-copy {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  color: var(--fg);
+}
+
+.code-copy.copied {
+  color: var(--accent);
 }
 
 pre {
@@ -803,15 +860,15 @@ hr {
   color: var(--fg-dim);
 }
 
-/* === TOC === */
+/* === TOC inline (narrow screens) === */
 
-.toc {
+.toc-inline {
   margin-bottom: 2rem;
   border-left: 3px solid var(--accent);
   padding-left: 1rem;
 }
 
-.toc summary {
+.toc-inline summary {
   cursor: pointer;
   font-weight: 600;
   color: var(--heading-color);
@@ -819,32 +876,132 @@ hr {
   margin-bottom: 0.5rem;
 }
 
-.toc nav > ul,
-.toc > details > nav > ul {
+.toc-inline nav > ul,
+.toc-inline > details > nav > ul {
   padding-left: 0;
 }
 
-.toc ul {
+.toc-inline ul {
   padding-left: 1.5em;
 }
 
-.toc li {
+.toc-inline li {
   margin-bottom: 0.15rem;
   line-height: 1.4;
 }
 
-.toc li::before {
+.toc-inline li::before {
   content: none;
 }
 
-.toc a {
+.toc-inline a {
   color: var(--fg);
   text-decoration: none;
   font-size: 0.875rem;
 }
 
-.toc a:hover {
+.toc-inline a:hover {
   color: var(--accent);
+}
+
+/* === TOC sidebar (wide screens) === */
+
+.toc-sidebar {
+  display: none;
+}
+
+.toc-tree ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-tree li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 0.85;
+}
+
+.toc-tree li::before {
+  content: none;
+}
+
+.toc-tree .tree-marker {
+  color: var(--fg-faint);
+  margin-right: 0.5ch;
+  font-size: 0.75rem;
+}
+
+.toc-tree a {
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+
+.toc-tree a.toc-active {
+  color: var(--fg);
+}
+
+.toc-tree a:hover {
+  color: var(--accent);
+}
+
+/* Collapse h3 items by default, expand for active section */
+.toc-tree ul ul {
+  padding-left: 2ch;
+  display: none;
+}
+
+.toc-tree li.toc-expand > ul {
+  display: block;
+}
+
+.toc-toggle {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .toc-inline {
+    display: none;
+  }
+
+  .toc-sidebar {
+    display: block;
+    position: fixed;
+    top: 2rem;
+    right: 1.5rem;
+    max-width: calc((100vw - 78ch) / 2 - 3rem);
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .toc-toggle {
+    display: block;
+    background: none;
+    border: none;
+    color: var(--fg-faint);
+    font-family: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 0.5rem;
+    margin-left: auto;
+    transition: color 0.15s;
+  }
+
+  .toc-toggle:hover {
+    color: var(--fg-dim);
+  }
+
+  .toc-sidebar.collapsed .toc-tree {
+    display: none;
+  }
+
+  .toc-sidebar.collapsed {
+    overflow: hidden;
+  }
 }
 
 /* === Heading anchors === */
@@ -908,4 +1065,114 @@ hr {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+/* === Print === */
+
+@media print {
+  /* Force readable colors */
+  html, body {
+    background: #fff !important;
+    color: #222 !important;
+    font-size: 12pt;
+  }
+
+  /* Hide UI chrome */
+  .site-header,
+  .vim-statusbar,
+  .toc-sidebar,
+  .toc-inline,
+  .theme-toggle,
+  .heading-anchor,
+  .code-copy {
+    display: none !important;
+  }
+
+  /* Reset layout */
+  body {
+    padding-bottom: 0;
+  }
+
+  .container {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Typography for print */
+  h1, h2, h3 {
+    color: #000 !important;
+    background: none !important;
+    break-after: avoid;
+  }
+
+  h2, h3 {
+    margin-left: 0;
+  }
+
+  a {
+    color: #222 !important;
+    text-decoration: underline;
+  }
+
+  /* Show link URLs */
+  .post-content a[href^="http"]::after {
+    content: " [" attr(href) "]";
+    font-size: 0.8em;
+    color: #666;
+    word-break: break-all;
+  }
+
+  /* Code blocks: no overflow, wrap instead */
+  pre {
+    background: #f5f5f5 !important;
+    border: 1px solid #ddd !important;
+    color: #222 !important;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: visible;
+  }
+
+  pre code, code {
+    color: #222 !important;
+    background: #f0f0f0 !important;
+    border-color: #ddd !important;
+  }
+
+  /* Chroma: strip all coloring */
+  .chroma, .chroma span {
+    color: #222 !important;
+    background: none !important;
+  }
+
+  /* Tables */
+  table, th, td {
+    border: 1px solid #999 !important;
+    color: #222 !important;
+  }
+
+  .post-content table {
+    font-size: inherit;
+  }
+
+  /* Keep content together */
+  pre, blockquote, table, img {
+    break-inside: avoid;
+  }
+
+  /* Badges readable */
+  .tech-badge {
+    background: none !important;
+    border: 1px solid #999 !important;
+    color: #222 !important;
+  }
+
+  /* Blockquotes */
+  blockquote {
+    color: #444 !important;
+    border-left-color: #999 !important;
+    background: none !important;
+  }
+
+  strong { color: #000 !important; }
+  em { color: #222 !important; }
 }
