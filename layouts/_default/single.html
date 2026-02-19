@@ -4,6 +4,14 @@
       <h1>{{ .Title }}</h1>
       <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan 2, 2006" }}</time>
     </header>
+    {{ if or (.Params.toc) (eq .Section "garden") }}
+    <nav class="toc">
+      <details open>
+        <summary>{{ if eq .Language.Lang "ru" }}Содержание{{ else }}Table of Contents{{ end }}</summary>
+        {{ .TableOfContents }}
+      </details>
+    </nav>
+    {{ end }}
     <section class="post-content">
       {{ .Content }}
     </section>

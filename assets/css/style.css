@@ -354,18 +354,20 @@ body {
   flex-direction: column;
   transition: background 0.15s, color 0.15s;
   padding-bottom: 1.75rem;
+  overflow-x: clip;
 }
 
 /* === Layout === */
 
 .container {
   width: 90%;
-  max-width: 47.5rem;
+  max-width: min(90%, 78ch);
   margin: 0 auto;
 }
 
 main {
   flex: 1;
+  min-width: 0;
   padding-bottom: 2rem;
 }
 
@@ -632,11 +634,21 @@ a:hover {
   font-size: 0.875rem;
 }
 
+.post-content {
+  line-height: 1.45;
+}
+
 .post-content p {
   margin-bottom: 0.75rem;
 }
 
 /* === Code === */
+
+.post-content .highlight {
+  width: fit-content;
+  min-width: 100%;
+  max-width: calc(100vw - 2rem);
+}
 
 pre {
   background: var(--pre-bg);
@@ -666,7 +678,7 @@ code {
   border: 1px solid var(--code-border);
   padding: 0.1em 0.4em;
   border-radius: 3px;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 /* === Tech badges === */
@@ -711,6 +723,13 @@ blockquote {
 }
 
 /* === Table === */
+
+.post-content table {
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  font-size: 0.875rem;
+}
 
 table {
   width: 100%;
@@ -784,7 +803,87 @@ hr {
   color: var(--fg-dim);
 }
 
+/* === TOC === */
+
+.toc {
+  margin-bottom: 2rem;
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}
+
+.toc summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--heading-color);
+  font-size: 0.9375rem;
+  margin-bottom: 0.5rem;
+}
+
+.toc nav > ul,
+.toc > details > nav > ul {
+  padding-left: 0;
+}
+
+.toc ul {
+  padding-left: 1.5em;
+}
+
+.toc li {
+  margin-bottom: 0.15rem;
+  line-height: 1.4;
+}
+
+.toc li::before {
+  content: none;
+}
+
+.toc a {
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.toc a:hover {
+  color: var(--accent);
+}
+
+/* === Heading anchors === */
+
+.post-content h2,
+.post-content h3 {
+  position: relative;
+}
+
+.heading-anchor {
+  color: var(--fg-faint);
+  text-decoration: none;
+  margin-left: 0.3em;
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-weight: normal;
+}
+
+.post-content h2:hover .heading-anchor,
+.post-content h3:hover .heading-anchor,
+.heading-anchor:focus {
+  opacity: 1;
+}
+
+.heading-anchor:hover {
+  color: var(--accent);
+}
+
 /* === Responsive === */
+
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+
+  .post-content table {
+    font-size: 0.8125rem;
+  }
+}
 
 @media (max-width: 600px) {
   .site-title {

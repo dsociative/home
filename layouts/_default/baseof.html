@@ -60,6 +60,17 @@
     }
     window.addEventListener('scroll', updateScroll, { passive: true });
     updateScroll();
+
+    // Heading anchor links
+    var headings = document.querySelectorAll('.post-content h2[id], .post-content h3[id]');
+    for (var i = 0; i < headings.length; i++) {
+      var a = document.createElement('a');
+      a.className = 'heading-anchor';
+      a.href = '#' + headings[i].id;
+      a.textContent = '\u00B6';
+      a.setAttribute('aria-label', 'Link to section');
+      headings[i].appendChild(a);
+    }
   })();
   </script>
 </body>
