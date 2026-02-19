@@ -1,10 +1,10 @@
 +++
 title = "Joining Events from Two Kafka Topics Without External Frameworks"
 date = 2026-02-19
-lastmod = 2026-02-19
-tags = ["kafka", "join", "stream-processing", "distributed-systems", "rust", "rdkafka"]
+lastmod = 2026-02-20
+tags = ["kafka", "join", "stream-processing", "distributed-systems", "rust", "rdkafka", "left-join", "one-to-many"]
 draft = false
-sourceHash = "b86fceccdf72e5730dd11fd6a9981cbc"
+sourceHash = "473972ca902c9aa4ed535e220a75e5ff"
 description = "Approaches to joining events from two Kafka topics without Kafka Streams, Flink, or ksqlDB — using only the consumer/producer API. Analysis of the case when the join key is in the message body and topics have different topologies."
 +++
 
@@ -525,6 +525,266 @@ On DB loss — standard recovery from backup. Data in Kafka (retention) allows r
 | **Database-backed**  | External DB | Instant             | No                   | High      | Complex joins, existing DB     |
 
 
+## Left/outer join: emitting without a pair {#left-outer-join-emit-при-отсутствии-пары}
+
+All approaches above implement **inner join** — the result appears only when both sides arrive. But often a left/outer join is needed: "show the order even if payment hasn't arrived" or "enrich the event with reference data but don't lose the event if the reference record is missing".
+
+
+### Semantics {#семантика}
+
+| Join type             | Result                                                           | Example                              |
+|-----------------------|------------------------------------------------------------------|--------------------------------------|
+| **Inner join**        | Only matched pairs                                               | Order + payment                      |
+| **Left join**         | All events from the left topic, right side = null if not found   | Order + payment (or `payment=null`)  |
+| **Outer (full) join** | All events from both topics, `null` on the missing side          | Order without payment + payment without order |
+
+
+### Problem: when to emit an unpaired event? {#проблема-когда-emit-ить-неспаренное-событие}
+
+In inner join, the answer is obvious — on match. In left/outer join, a decision is needed: **how long to wait** for the other side before emitting a partial result with `null`?
+
+Options:
+
+
+#### Timeout-based emit {#timeout-based-emit}
+
+The most common approach. An event from the left topic waits for a pair N seconds/minutes. If no match occurs within that time — emit with `payment=null`.
+
+```text
+Order("ORD-123", payment_ref="PAY-456") arrives at t=0
+  → insert into buffer, start timer(5 min)
+
+If Payment("PAY-456") hasn't arrived in 5 min:
+  → emit { order: "ORD-123", payment: null }
+  → remove from buffer
+
+If Payment arrives at t=3 min:
+  → cancel timer
+  → emit { order: "ORD-123", payment: {...} }
+```
+
+Implementation with `moka`: the eviction listener is the left join emit. TTL eviction = "pair didn't arrive":
+
+```rust
+let buffer: Cache<String, Pending> = Cache::builder()
+    .time_to_live(Duration::from_secs(300))
+    .async_eviction_listener(|key, value, cause| {
+        Box::pin(async move {
+            if matches!(cause, RemovalCause::Expired) {
+                // Left join: emit with null side
+                match value {
+                    Pending::HasOrder(order) => {
+                        emit_left_join(&producer, &order, None).await;
+                    }
+                    Pending::HasPayment(payment) => {
+                        // For full outer join
+                        emit_left_join_payment(&producer, None, &payment).await;
+                    }
+                }
+            }
+        })
+    })
+    .build();
+```
+
+
+#### Watermark-based emit {#watermark-based-emit}
+
+Instead of a wall-clock timer — rely on event time. When the watermark (minimum timestamp across all consumed partitions) exceeds `event_time + grace_period` — the event is considered "unmatched".
+
+Advantages: works correctly during replay and catch-up (processing time can differ significantly from event time). Harder to implement: requires tracking the watermark across all partitions of both topics.
+
+
+#### Completion signal {#completion-signal}
+
+For some use cases, the other side is **guaranteed to arrive or explicitly decline**. For example, a payment gateway sends either `status=confirmed` or `status=declined`. In this case, no timeout is needed — wait for an explicit signal.
+
+
+### Left join and idempotency {#left-join-и-idempotency}
+
+The problem: timeout fired, emitted `order + null`. A second later, the payment arrives. What to do?
+
+Options:
+
+-   **Ignore late match** — the payment arrived after timeout, we discard it. Simplest option, but data is lost.
+-   **Emit correction** — emit a second event `order + payment` with a `corrected=true` flag. Downstream must be able to update a previously emitted result (upsert by `order_id`).
+-   **Tombstone + re-emit** — delete the previous partial result (tombstone in the output topic), then emit the full one. Works if the output topic is compacted.
+
+In practice, **emit correction** is most commonly used — it's simpler than managing tombstones, and downstream usually already supports upsert.
+
+
+### Left join in the decision tree {#left-join-в-дереве-решений}
+
+Left/outer join **doesn't change** the choice of approach (1--5). It changes the **emit logic** within the chosen approach: instead of "emit on match, discard on timeout" — "emit on match OR on timeout (with null)".
+
+
+## One-to-many (1:N) join: one order — N line items {#one-to-many--1-n--join-один-заказ-n-позиций}
+
+The standard join assumes 1:1 — one order corresponds to one payment. But often the ratio is 1:N: one order contains N line items, one shipment includes N packages, one user has N addresses.
+
+
+### Problem: when to emit? {#проблема-когда-emit-ить}
+
+In 1:1 join it's simple: both sides arrived → emit. In 1:N: the "single" side (order) and the first of N items arrive. Should we wait for the rest? How many are there?
+
+```text
+Topic A: orders
+  { "order_id": "ORD-1", "line_count": 3 }
+
+Topic B: line_items
+  { "order_id": "ORD-1", "line_num": 1, "product": "laptop" }
+  { "order_id": "ORD-1", "line_num": 2, "product": "mouse" }
+  { "order_id": "ORD-1", "line_num": 3, "product": "keyboard" }
+```
+
+Strategy options:
+
+
+#### Eager emit (emit on each match) {#eager-emit--emit-на-каждый-match}
+
+Each item, upon finding a match in the buffer, emits a joined result. For one order there will be N output events.
+
+```text
+emit: { order: "ORD-1", item: "laptop" }
+emit: { order: "ORD-1", item: "mouse" }
+emit: { order: "ORD-1", item: "keyboard" }
+```
+
+Pros: minimal latency, simple logic (nothing to buffer on the N side).
+Cons: downstream receives N events instead of one; if aggregation is needed (total order cost) — downstream does it itself.
+
+
+#### Count-based collect (known N) {#count-based-collect--известное-n}
+
+If the "single" side contains `line_count` (or N is known in advance), all N items can be collected in the buffer and a single event emitted with the complete set:
+
+```rust
+#[derive(Clone)]
+struct PendingOrder {
+    order: Order,
+    expected: usize,
+    items: Vec<LineItem>,
+}
+
+async fn try_join_item(
+    buf: &JoinBuffer,
+    producer: &FutureProducer,
+    item: LineItem,
+) {
+    let key = item.order_id.clone();
+    if let Some(mut pending) = buf.remove(&key).await {
+        pending.items.push(item);
+        if pending.items.len() == pending.expected {
+            // All items collected — emit complete order
+            emit_complete_order(producer, &pending).await;
+        } else {
+            // Still waiting — put back in buffer
+            buf.insert(key, pending).await;
+        }
+    }
+    // If order hasn't arrived yet — buffer the item separately
+}
+```
+
+Pros: a single output event with complete data.
+Cons: N must be known in advance; if one of the N items is lost — the order "hangs" in the buffer forever (timeout needed).
+
+
+#### Timeout-based collect (unknown N) {#timeout-based-collect--неизвестное-n}
+
+N is unknown or may change. Items are collected in the buffer, emitted on timeout — "everything collected within T seconds is considered the complete set".
+
+```text
+t=0: Order("ORD-1") → create buffer entry, start timer(30s)
+t=1: LineItem(line=1) → append to buffer
+t=3: LineItem(line=2) → append to buffer
+t=8: LineItem(line=3) → append to buffer
+t=30: timer fired → emit { order: "ORD-1", items: [1, 2, 3] }
+```
+
+Pros: N doesn't need to be known; resilient to loss of individual items (emits what's available).
+Cons: latency = timeout; if an item arrives after timeout — it's lost (or a correction is needed, as in left join).
+
+
+#### Completion event {#completion-event}
+
+The producer sends an explicit "end of group" event (`type=order_complete`). The collector waits specifically for it:
+
+```text
+LineItem(order="ORD-1", line=1)
+LineItem(order="ORD-1", line=2)
+LineItem(order="ORD-1", line=3)
+OrderComplete(order="ORD-1")  ← signal: all items sent
+```
+
+Pros: precise emit moment without timeout.
+Cons: requires cooperation with the producer; the completion event can be lost (fallback timeout needed).
+
+
+### Strategy selection {#выбор-стратегии}
+
+| Strategy             | N known? | Latency       | Data completeness | Complexity |
+|----------------------|----------|---------------|-------------------|-----------|
+| **Eager emit**       | N/A      | Minimal       | Per-item          | Low       |
+| **Count-based**      | Yes      | Until last    | Complete          | Medium    |
+| **Timeout-based**    | No       | = timeout     | Best-effort       | Medium    |
+| **Completion event** | No       | Until signal  | Complete          | Medium    |
+
+Recommendations:
+
+-   Downstream can aggregate on its own (Kafka Streams, Flink, DB with GROUP BY) → **eager emit**
+-   N is known and small (< 100) → **count-based** with fallback timeout
+-   N is unknown, eventual consistency is acceptable → **timeout-based**
+-   You control both producers → **completion event** with fallback timeout
+
+
+### 1:N and memory {#1-n-и-память}
+
+For count-based and timeout-based strategies, the buffer stores not a single pending event but a **collection**. Memory estimate: if the average order = 10 items at 200 bytes, 100K pending orders = 100K × 10 × 200 = **200 MB**. For large N or payloads — switch to RocksDB (store `Vec<LineItem>` serialized in the value).
+
+Cuckoo filter still works: the filter key is `order_id`, L2 stores the collection.
+
+
+## Multi-way join: 3+ topics {#multi-way-join-3-plus-топика}
+
+All approaches above consider joining two topics. In practice, joining 3 or more is often needed.
+
+
+### Cascade of pairwise joins {#каскад-попарных-join-ов}
+
+The most straightforward path: join(A, B) → intermediate result → join(AB, C).
+
+```text
+Topic A ──┐
+          ├── join(A, B) ──► Intermediate AB ──┐
+Topic B ──┘                                    ├── join(AB, C) ──► Result
+Topic C ──────────────────────────────────────-┘
+```
+
+Each stage is one of approaches 1--5. The intermediate result can be a Kafka topic (adds a hop and latency) or in-process (if everything is in one consumer).
+
+Problem: **latency grows linearly** with the number of joins. For N topics — N-1 sequential stages.
+
+
+### Star schema: one "central" topic {#star-schema-один-центральный-топик}
+
+If one topic contains keys to all others (like a fact table in star schema), N-1 independent lookups can be done in parallel:
+
+```text
+Topic A (fact) ──► Consumer: for each event
+                     ├── lookup in Table B (by key_b from body)
+                     ├── lookup in Table C (by key_c from body)
+                     └── emit enriched(A + B + C)
+```
+
+Tables B, C — compacted topics or embedded stores ([approach 2](#подход-2-compacted-topic-как-lookup-table) / [approach 3](#подход-3-embedded-state-store--rocksdb-badgerdb-sqlite)). Latency = one hop (only reading the fact topic), but memory = sum of all references.
+
+
+### When not to do it manually {#когда-не-стоит-делать-вручную}
+
+With 3+ topics, the complexity of manual joins grows quickly: state management, rebalancing, exactly-once — everything multiplies by the number of stages. This is the case where Kafka Streams (`KStream.join().join()`), Flink SQL, or [Arroyo](#обзор-существующих-решений) pay for themselves.
+
+
 ## Common edge cases and recommendations {#общие-edge-cases-и-рекомендации}
 
 
@@ -718,6 +978,43 @@ Eviction: every 15 minutes → drop oldest time bucket from RocksDB
 | **Total Disk**      | **~400 MB**     |
 
 For comparison: a naive `HashMap<String, FullEvent>` with 5M entries = **~5.5 GB RAM**.
+
+
+## Which approach to choose: decision tree {#какой-подход-выбрать-дерево-решений}
+
+A cheat sheet for quickly choosing an approach based on task characteristics.
+
+```text
+Is the join key the Kafka key in both topics?
+│
+├── YES → Are topics co-partitioned?
+│         │
+│         ├── YES → Does state fit in RAM?
+│         │         ├── YES → Approach 1: In-memory HashMap
+│         │         └── NO  → Approach 3: Embedded store
+│         │
+│         └── NO  → Can the topic be recreated?
+│                   ├── YES → Recreate, approach 1 or 3
+│                   └── NO  → Approach 4: Repartitioning
+│
+└── NO  → Join key is in the message body (payload)
+          │
+          ├── One topic is a reference?
+          │   ├── YES, fits in RAM → Approach 2: Compacted + HashMap
+          │   └── YES, doesn't fit → Approach 2 + embedded store
+          │
+          ├── Both topics are event streams?
+          │   ├── Have a DB → Approach 5: Database-backed
+          │   ├── High throughput → Repartitioning
+          │   └── One is small → Global buffer
+          │
+          └── Millions of pending keys?
+              → Cuckoo/BinaryFuse (L1) + RocksDB (L2)
+
+Orthogonal decisions:
+├── Left/outer join → Timeout/watermark emit
+└── 1:N join → Count-based / timeout / completion
+```
 
 
 ## What Kafka Streams does under the hood {#что-делает-kafka-streams-под-капотом}
@@ -1117,6 +1414,30 @@ For TTL in RocksDB: use `compaction_filter` that checks the timestamp in the val
 4.  **Rebalance and state** — on rebalance, `moka` cache **doesn't know** about partitions. If one instance was receiving partition 0 of "orders" and put a pending event in cache, and after rebalance the partition moved to another instance — the pending event stays in the first instance's cache and will never be matched. For partition-local join, maintain separate state per partition (`HashMap<(topic, partition), Cache>`) and clear on `Rebalance::Revoke`.
 
 5.  **Backpressure** — `FutureProducer::send` blocks if librdkafka's internal buffer is full (`queue.buffering.max.messages`, default 100000). At high join throughput, the producer can become a bottleneck.
+
+6.  **Duplicate keys** — in the sketch above, `try_join_order` silently overwrites the pending entry in the buffer when a repeated order with the same `payment_ref` arrives. The first order is lost. If duplicates are possible — a strategy is needed: store `Vec<Order>` instead of one, or reject with logging, or use `entry_or_insert` and check.
+
+7.  **Graceful shutdown** — the sketch doesn't handle SIGTERM. In production, you need to intercept the signal, stop consuming, flush pending state (send to DLT or changelog), commit offsets:
+
+<!--listend-->
+
+```rust
+use tokio::signal;
+
+loop {
+    tokio::select! {
+        msg = consumer.recv() => {
+            // processing as in the sketch above
+        }
+        _ = signal::ctrl_c() => {
+            tracing::info!("shutting down: flushing pending state");
+            // Iterate buffer, send unmatched to DLT
+            // consumer.commit_consumer_state(CommitMode::Sync).unwrap();
+            break;
+        }
+    }
+}
+```
 
 
 ## Overview of existing solutions {#обзор-существующих-решений}

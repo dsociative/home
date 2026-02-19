@@ -2,7 +2,7 @@
 title = "Join событий из двух Kafka-топиков без внешних фреймворков"
 date = 2026-02-19
 lastmod = 2026-02-19
-tags = ["kafka", "join", "stream-processing", "distributed-systems", "rust", "rdkafka"]
+tags = ["kafka", "join", "stream-processing", "distributed-systems", "rust", "rdkafka", "left-join", "one-to-many"]
 draft = false
 description = "Подходы к join событий из двух Kafka-топиков без Kafka Streams, Flink и ksqlDB — только consumer/producer API. Разбор случая когда join key лежит в теле сообщения, а топики имеют разную топологию."
 +++
@@ -23,159 +23,6 @@ description = "Подходы к join событий из двух Kafka-топ�
 Если co-partitioning нарушен, необходимо либо repartitioning (см. [соответствующий раздел](#подход-4-repartitioning-промежуточный-топик)), либо глобальный подход (compacted topic как lookup table, база данных).
 
 Это то, что Kafka Streams делает автоматически: проверяет co-partitioning при старте и падает с ошибкой `TopologyException` при несовпадении ([Confluent: How Co-Partitioning Works in Kafka Streams](https://www.confluent.io/blog/co-partitioning-in-kafka-streams/)).
-
-
-## Худший случай: join key в теле сообщения, топологии не совпадают {#худший-случай-join-key-в-теле-сообщения-топологии-не-совпадают}
-
-Отдельно стоит рассмотреть ситуацию, когда два топика не просто имеют разное количество партиций, а **полностью различную топологию**: разные Kafka-ключи, разное количество партиций, и при этом join key **не является Kafka-ключом ни в одном из топиков** — он лежит в теле (payload) сообщения.
-
-
-### Пример {#пример}
-
-```text
-Topic A: "orders" (key=order_id, 12 partitions)
-  body: { "order_id": "ORD-123", "items": [...], "payment_ref": "PAY-456" }
-
-Topic B: "payments" (key=payment_id, 8 partitions)
-  body: { "payment_id": "PAY-456", "amount": 1500, "status": "confirmed" }
-
-Join condition: A.body.payment_ref == B.key (или B.body.payment_id)
-```
-
-Kafka-ключ в топике A — `order_id`, в топике B — `payment_id`. Join нужен по `payment_ref`, который лежит **в теле** сообщения A. Co-partitioning невозможен в принципе — ключи даже семантически разные.
-
-
-### Почему это сложнее стандартного join {#почему-это-сложнее-стандартного-join}
-
-1.  **Partition-local join невозможен** — события с одинаковым `payment_ref` / `payment_id` лежат в произвольных партициях разных топиков. Consumer, читающий партицию 0 обоих топиков, не увидит обе стороны join-а.
-2.  **Join key нужно извлекать из payload** — десериализация обязательна для каждого сообщения ещё до того, как решим, что с ним делать.
-3.  **Нельзя просто подписаться на оба топика** — даже если consumer читает все партиции обоих топиков, при горизонтальном масштабировании (несколько инстансов) каждый инстанс видит только часть партиций, и join рассыпается.
-
-
-### Какие подходы работают {#какие-подходы-работают}
-
-
-#### Вариант A: Repartitioning обоих топиков {#вариант-a-repartitioning-обоих-топиков}
-
-Самый «честный» подход. Оба топика re-key по join key в промежуточные топики с одинаковым количеством партиций:
-
-```text
-Topic A (key=order_id) ──► extract payment_ref из body ──► Intermediate A' (key=payment_ref, 8 partitions)
-Topic B (key=payment_id) ──────────────────────────────────► (уже partitioned by payment_id, 8 partitions)
-
-Если B.key == join key, repartitioning нужен только для A.
-Если join key в теле обоих топиков — repartition оба.
-
-Intermediate A' + Topic B (или B') → partition-local join
-```
-
-Плюсы:
-
--   После repartitioning — стандартный partition-local join, масштабируется горизонтально
--   Каждый инстанс обрабатывает только свои партиции
-
-Минусы:
-
--   **Два дополнительных Kafka hop-а** (если repartition обоих) — двойная задержка
--   Промежуточные топики занимают место
--   Нужно гарантировать exactly-once на этапе re-key (Kafka transactions)
--   Если join key скрыт глубоко в nested JSON / protobuf — десериализация на этапе repartitioning, потом повторная на этапе join
-
-
-#### Вариант B: Глобальный буфер (broadcast-подход) {#вариант-b-глобальный-буфер--broadcast-подход}
-
-Один из топиков (меньший по объёму) читается **целиком** — все партиции, каждым инстансом consumer-а. Из тела сообщений извлекается join key, строится глобальная lookup-таблица. Второй топик стримится обычным образом.
-
-```text
-Topic B (payments) ──► каждый инстанс читает ВСЕ партиции ──► Map<payment_id, Payment>
-Topic A (orders)   ──► stream: extract payment_ref из body ──► lookup в Map ──► emit joined
-```
-
-Реализация: для «глобального» топика использовать `consumer.assign()` вместо `subscribe()` — вручную назначить все партиции каждому инстансу. Это именно то, что делает `GlobalKTable` в Kafka Streams.
-
-Плюсы:
-
--   Не нужен repartitioning
--   Не нужен co-partitioning
--   Простая реализация
-
-Минусы:
-
--   **Каждый инстанс хранит полную копию** глобального топика — O(N) памяти где N — полный размер справочника
--   Не подходит, если «справочный» топик большой (миллионы записей × килобайты = гигабайты на каждый инстанс)
--   Обновления справочника приходят с задержкой — eventual consistency
-
-
-#### Вариант C: Database-backed join с извлечением ключа {#вариант-c-database-backed-join-с-извлечением-ключа}
-
-Оба consumer-а десериализуют payload, извлекают join key и пишут в БД с индексом по join key:
-
-```sql
--- Consumer A пишет:
-INSERT INTO orders (order_id, payment_ref, payload, ts)
-VALUES ('ORD-123', 'PAY-456', '...', now())
-ON CONFLICT (order_id) DO UPDATE SET payload = EXCLUDED.payload;
-
--- Consumer B пишет:
-INSERT INTO payments (payment_id, payload, ts)
-VALUES ('PAY-456', '...', now())
-ON CONFLICT (payment_id) DO UPDATE SET payload = EXCLUDED.payload;
-
--- Join:
-SELECT o.*, p.*
-FROM orders o
-JOIN payments p ON o.payment_ref = p.payment_id;
-```
-
-Плюсы:
-
--   Самый простой для понимания
--   SQL даёт гибкость — любая логика join-а, фильтрация, агрегация
--   Индекс по join key делает lookup быстрым
--   Не нужен repartitioning, не нужен co-partitioning
-
-Минусы:
-
--   БД как bottleneck при высоком throughput
--   Exactly-once между Kafka и БД — outbox pattern или idempotent writes
--   Сетевая задержка на каждый INSERT
-
-
-#### Вариант D: Request-response через промежуточный топик {#вариант-d-request-response-через-промежуточный-топик}
-
-Если join асимметричен (поток A инициирует, нужно дождаться ответа из потока B), можно организовать correlation:
-
-```text
-Topic A (orders) ──► Consumer: извлечь payment_ref ──► запомнить correlation {payment_ref → order}
-                                                    ──► (опционально) запросить данные через Topic B
-
-Topic B (payments) ──► Consumer: получить payment ──► lookup correlation по payment_id ──► emit joined
-```
-
-Это фактически паттерн [Correlation Identifier](https://www.enterpriseintegrationpatterns.com/patterns/messaging/CorrelationIdentifier.html) из Enterprise Integration Patterns. Consumer хранит `Map<join_key, PendingRequest>` и матчит входящие события из обоих топиков по extracted join key.
-
-
-### Какие подходы НЕ работают {#какие-подходы-не-работают}
-
--   **Partition-local join без repartitioning** (подходы 1 и 3 «в лоб») — join key в произвольных партициях, partition-local state не поможет
--   **Простой `subscribe()` на оба топика** — при масштабировании каждый инстанс видит только часть данных, join key может быть разделён между инстансами
-
-
-### Сводка по вариантам для случая «join key в теле» {#сводка-по-вариантам-для-случая-join-key-в-теле}
-
-| Вариант                 | Repartitioning      | Память на инстанс        | Масштабируемость              | Задержка                  |
-|-------------------------|---------------------|--------------------------|-------------------------------|---------------------------|
-| **A: Repartitioning**   | Да (1 или 2 топика) | Только join state        | Горизонтальная                | +1-2 Kafka hop            |
-| **B: Глобальный буфер** | Нет                 | Полная копия справочника | Вертикальная (RAM-bound)      | Минимальная               |
-| **C: Database-backed**  | Нет                 | Минимальная              | Зависит от БД                 | Сетевая задержка          |
-| **D: Correlation ID**   | Нет                 | Map pending requests     | Горизонтальная (с оговорками) | Зависит от второго топика |
-
-Выбор зависит от:
-
--   **Размер «справочного» топика** — помещается в RAM → вариант B; нет → вариант A или C
--   **Throughput** — высокий → вариант A (partition-local после repartitioning); умеренный → вариант C
--   **Уже есть БД** → вариант C — минимум кода
--   **Асимметричный join** (один инициирует, другой отвечает) → вариант D
 
 
 ## Подход 1: Client-side join с in-memory store {#подход-1-client-side-join-с-in-memory-store}
@@ -394,10 +241,14 @@ State уже на диске — **мгновенный рестарт**. Это
 Если два топика партиционированы по-разному (разные ключи или разное количество партиций), прямой partition-local join невозможен. Решение: **produce** события из одного (или обоих) топиков в промежуточный топик, партиционированный по join key.
 
 ```text
-Topic A (by user_id, 12 partitions)  ──► re-key by order_id ──► Intermediate A' (by order_id, 8 partitions)
-Topic B (by order_id, 8 partitions)  ──────────────────────────► (already correct)
+Topic A (user_id, 12 parts)
+  ──► re-key by order_id
+  ──► Intermediate A' (order_id, 8 parts)
 
-Intermediate A' + Topic B → partition-local join (подход 1 или 3)
+Topic B (order_id, 8 parts)
+  ──► already correct
+
+A' + Topic B → partition-local join (подход 1/3)
 ```
 
 Это аналог `KStream#repartition()` из Kafka Streams, но вручную ([Kafka Streams Co-Partitioning Requirements Illustrated](https://medium.com/publicis-sapient-france/kafka-streams-co-partitioning-requirements-illustrated-2033f686b19c)).
@@ -524,6 +375,368 @@ State в БД — **переживает рестарт**. Consumer просто
 | **Database-backed**  | Внешняя БД  | Мгновенный          | Нет                  | Высокая   | Сложные join-ы, уже есть БД    |
 
 
+## Худший случай: join key в теле сообщения, топологии не совпадают {#худший-случай-join-key-в-теле-сообщения-топологии-не-совпадают}
+
+Отдельно стоит рассмотреть ситуацию, когда два топика не просто имеют разное количество партиций, а **полностью различную топологию**: разные Kafka-ключи, разное количество партиций, и при этом join key **не является Kafka-ключом ни в одном из топиков** — он лежит в теле (payload) сообщения.
+
+
+### Пример {#пример}
+
+```text
+Topic A: "orders" (key=order_id, 12 partitions)
+  body: { "order_id": "ORD-123", "items": [...], "payment_ref": "PAY-456" }
+
+Topic B: "payments" (key=payment_id, 8 partitions)
+  body: { "payment_id": "PAY-456", "amount": 1500, "status": "confirmed" }
+
+Join condition: A.body.payment_ref == B.key (или B.body.payment_id)
+```
+
+Kafka-ключ в топике A — `order_id`, в топике B — `payment_id`. Join нужен по `payment_ref`, который лежит **в теле** сообщения A. Co-partitioning невозможен в принципе — ключи даже семантически разные.
+
+
+### Почему это сложнее стандартного join {#почему-это-сложнее-стандартного-join}
+
+1.  **Partition-local join невозможен** — события с одинаковым `payment_ref` / `payment_id` лежат в произвольных партициях разных топиков. Consumer, читающий партицию 0 обоих топиков, не увидит обе стороны join-а.
+2.  **Join key нужно извлекать из payload** — десериализация обязательна для каждого сообщения ещё до того, как решим, что с ним делать.
+3.  **Нельзя просто подписаться на оба топика** — даже если consumer читает все партиции обоих топиков, при горизонтальном масштабировании (несколько инстансов) каждый инстанс видит только часть партиций, и join рассыпается.
+
+
+### Какие подходы работают {#какие-подходы-работают}
+
+Все подходы из предыдущих разделов применимы, но с нюансами:
+
+
+#### Вариант A: Repartitioning по join key из body {#вариант-a-repartitioning-по-join-key-из-body}
+
+Применяем [Подход 4](#подход-4-repartitioning-промежуточный-топик), но join key **извлекаем из body** перед re-key. Если `B.key =` join_key= — repartitioning нужен только для A. Если join key в теле обоих — repartition оба.
+
+```text
+Topic A (key=order_id)
+  ──► deserialize body, extract payment_ref
+  ──► produce to A' (key=payment_ref, 8 parts)
+
+Topic B (key=payment_id)
+  ──► уже partitioned by payment_id, 8 parts
+
+A' + Topic B → partition-local join (подход 1/3)
+```
+
+Специфика: десериализация каждого сообщения **обязательна** на этапе repartitioning. Если join key глубоко в nested JSON / protobuf — это дорого и делается дважды (при re-key + при join).
+
+
+#### Вариант B: Глобальный буфер (broadcast) {#вариант-b-глобальный-буфер--broadcast}
+
+Применяем [Подход 2](#подход-2-compacted-topic-как-lookup-table) — один из топиков читается **целиком** каждым инстансом (`consumer.assign()` вместо `subscribe()`, аналог `GlobalKTable`). Из тела извлекается join key → строится `Map<join_key, Event>`. Второй топик стримится и делает lookup.
+
+Специфика: не требует co-partitioning; каждый инстанс хранит **полную копию** — O(N) памяти. Не подходит, если «справочный» топик большой.
+
+
+#### Вариант C: Database-backed join {#вариант-c-database-backed-join}
+
+Применяем [Подход 5](#подход-5-database-backed-join) — оба consumer-а десериализуют payload, извлекают join key и пишут в БД с **индексом по join key**:
+
+```sql
+INSERT INTO orders (order_id, payment_ref, payload, ts)
+VALUES ('ORD-123', 'PAY-456', '...', now())
+ON CONFLICT (order_id) DO UPDATE SET payload = EXCLUDED.payload;
+
+-- Join по extracted key:
+SELECT o.*, p.* FROM orders o
+JOIN payments p ON o.payment_ref = p.payment_id;
+```
+
+Специфика: самый простой вариант, если БД уже есть. SQL даёт гибкость для сложной join-логики.
+
+
+#### Вариант D: Correlation Identifier {#вариант-d-correlation-identifier}
+
+Паттерн [Correlation Identifier](https://www.enterpriseintegrationpatterns.com/patterns/messaging/CorrelationIdentifier.html) из Enterprise Integration Patterns. Consumer хранит `Map<join_key, PendingRequest>`, извлекая join key из тела обоих топиков. По сути — [Подход 1](#подход-1-client-side-join-с-in-memory-store), где ключом HashMap служит extracted field, а не Kafka key. Подходит для асимметричных join-ов (поток A инициирует, B отвечает).
+
+
+### Какие подходы НЕ работают {#какие-подходы-не-работают}
+
+-   **Partition-local join без repartitioning** (подходы 1 и 3 «в лоб») — join key в произвольных партициях, partition-local state не поможет
+-   **Простой `subscribe()` на оба топика** — при масштабировании каждый инстанс видит только часть данных, join key может быть разделён между инстансами
+
+
+### Сводка по вариантам для случая «join key в теле» {#сводка-по-вариантам-для-случая-join-key-в-теле}
+
+| Вариант                 | Repartitioning      | Память на инстанс        | Масштабируемость              | Задержка                  |
+|-------------------------|---------------------|--------------------------|-------------------------------|---------------------------|
+| **A: Repartitioning**   | Да (1 или 2 топика) | Только join state        | Горизонтальная                | +1-2 Kafka hop            |
+| **B: Глобальный буфер** | Нет                 | Полная копия справочника | Вертикальная (RAM-bound)      | Минимальная               |
+| **C: Database-backed**  | Нет                 | Минимальная              | Зависит от БД                 | Сетевая задержка          |
+| **D: Correlation ID**   | Нет                 | Map pending requests     | Горизонтальная (с оговорками) | Зависит от второго топика |
+
+Выбор зависит от:
+
+-   **Размер «справочного» топика** — помещается в RAM → вариант B; нет → вариант A или C
+-   **Throughput** — высокий → вариант A (partition-local после repartitioning); умеренный → вариант C
+-   **Уже есть БД** → вариант C — минимум кода
+-   **Асимметричный join** (один инициирует, другой отвечает) → вариант D
+
+
+## Left/outer join: emit при отсутствии пары {#left-outer-join-emit-при-отсутствии-пары}
+
+Все подходы выше реализуют **inner join** — результат появляется только когда обе стороны пришли. Но часто нужен left/outer join: «показать заказ, даже если оплата не пришла» или «обогатить событие данными из справочника, но не терять событие при отсутствии справочной записи».
+
+
+### Семантика {#семантика}
+
+| Тип join              | Результат                                                        | Пример                               |
+|-----------------------|------------------------------------------------------------------|--------------------------------------|
+| **Inner join**        | Только matched пары                                              | Заказ + оплата                       |
+| **Left join**         | Все события левого топика, правая сторона = null если не найдена | Заказ + оплата (или `payment=null`)  |
+| **Outer (full) join** | Все события обоих топиков, `null` с пропущенной стороны          | Заказ без оплаты + оплата без заказа |
+
+
+### Проблема: когда emit-ить неспаренное событие? {#проблема-когда-emit-ить-неспаренное-событие}
+
+В inner join ответ очевиден — при match. В left/outer join нужно решить: **сколько ждать** вторую сторону, прежде чем emit-ить partial result с `null`?
+
+Варианты:
+
+
+#### Timeout-based emit {#timeout-based-emit}
+
+Самый распространённый подход. Событие из левого топика ждёт пару N секунд/минут. Если за это время match не произошёл — emit с `payment=null`.
+
+```text
+Order("ORD-123", payment_ref="PAY-456") поступает в t=0
+  → insert в буфер, запустить таймер(5 мин)
+
+Если за 5 мин Payment("PAY-456") не пришёл:
+  → emit { order: "ORD-123", payment: null }
+  → удалить из буфера
+
+Если Payment пришёл в t=3 мин:
+  → отменить таймер
+  → emit { order: "ORD-123", payment: {...} }
+```
+
+Реализация с `moka`: eviction listener — это и есть left join emit. Eviction по TTL = «пара не пришла»:
+
+```rust
+let buffer: Cache<String, Pending> = Cache::builder()
+    .time_to_live(Duration::from_secs(300))
+    .async_eviction_listener(|key, value, cause| {
+        Box::pin(async move {
+            if matches!(cause, RemovalCause::Expired) {
+                // Left join: emit с null-стороной
+                match value {
+                    Pending::HasOrder(order) => {
+                        emit_left_join(&producer, &order, None).await;
+                    }
+                    Pending::HasPayment(payment) => {
+                        // Для full outer join
+                        emit_left_join_payment(&producer, None, &payment).await;
+                    }
+                }
+            }
+        })
+    })
+    .build();
+```
+
+
+#### Watermark-based emit {#watermark-based-emit}
+
+Вместо wall-clock таймера — ориентироваться на event time. Когда watermark (минимальный timestamp среди всех потребляемых партиций) превышает `event_time + grace_period` — событие считается «не дождавшимся пары».
+
+Преимущества: корректно работает при replay и catch-up (processing time может сильно отличаться от event time). Сложнее в реализации: нужно отслеживать watermark по всем партициям обоих топиков.
+
+
+#### Completion signal {#completion-signal}
+
+Для некоторых use case-ов вторая сторона **гарантированно придёт или явно откажет**. Например, payment gateway отправляет либо `status=confirmed`, либо `status=declined`. В этом случае timeout не нужен — ждём явный сигнал.
+
+
+### Left join и idempotency {#left-join-и-idempotency}
+
+Проблема: timeout сработал, emit-или `order + null`. Через секунду пришёл payment. Что делать?
+
+Варианты:
+
+-   **Ignore late match** — payment пришёл после timeout, мы его выбрасываем. Простейший вариант, но данные теряются.
+-   **Emit correction** — emit второе событие `order + payment` с флагом `corrected=true`. Downstream должен уметь обновлять ранее выданный результат (upsert по `order_id`).
+-   **Tombstone + re-emit** — удалить предыдущий partial result (tombstone в выходной топик), затем emit полный. Работает, если выходной топик compacted.
+
+На практике чаще всего используют **emit correction** — это проще, чем управлять tombstone-ами, и downstream обычно уже умеет upsert.
+
+
+### Left join в дереве решений {#left-join-в-дереве-решений}
+
+Left/outer join **не меняет** выбор подхода (1--5). Он меняет **логику emit-а** внутри выбранного подхода: вместо «emit при match, discard при timeout» — «emit при match ИЛИ при timeout (с null)».
+
+
+## One-to-many (1:N) join: один заказ — N позиций {#one-to-many--1-n--join-один-заказ-n-позиций}
+
+Стандартный join предполагает 1:1 — одному заказу соответствует одна оплата. Но часто соотношение 1:N: один заказ содержит N позиций (line items), одна отправка включает N посылок, один пользователь имеет N адресов.
+
+
+### Проблема: когда emit-ить? {#проблема-когда-emit-ить}
+
+В 1:1 join всё просто: пришли обе стороны → emit. В 1:N: пришла «единичная» сторона (заказ) и первая из N позиций. Ждать ли остальные? Сколько их?
+
+```text
+Topic A: orders
+  { "order_id": "ORD-1", "line_count": 3 }
+
+Topic B: line_items
+  { "order_id": "ORD-1", "line_num": 1, "product": "laptop" }
+  { "order_id": "ORD-1", "line_num": 2, "product": "mouse" }
+  { "order_id": "ORD-1", "line_num": 3, "product": "keyboard" }
+```
+
+Варианты стратегии:
+
+
+#### Eager emit (emit на каждый match) {#eager-emit--emit-на-каждый-match}
+
+Каждая позиция, найдя пару в буфере, emit-ит joined-результат. Для одного заказа будет N выходных событий.
+
+```text
+emit: { order: "ORD-1", item: "laptop" }
+emit: { order: "ORD-1", item: "mouse" }
+emit: { order: "ORD-1", item: "keyboard" }
+```
+
+Плюсы: минимальная задержка, простая логика (ничего не буферизуем на стороне N).
+Минусы: downstream получает N событий вместо одного; если нужна агрегация (полная стоимость заказа) — downstream делает её сам.
+
+
+#### Count-based collect (известное N) {#count-based-collect--известное-n}
+
+Если «единичная» сторона содержит `line_count` (или N известно заранее), можно собирать все N позиций в буфере и emit-ить одно событие с полным набором:
+
+```rust
+#[derive(Clone)]
+struct PendingOrder {
+    order: Order,
+    expected: usize,
+    items: Vec<LineItem>,
+}
+
+async fn try_join_item(
+    buf: &JoinBuffer,
+    producer: &FutureProducer,
+    item: LineItem,
+) {
+    let key = item.order_id.clone();
+    if let Some(mut pending) = buf.remove(&key).await {
+        pending.items.push(item);
+        if pending.items.len() == pending.expected {
+            // Все позиции собраны — emit полный заказ
+            emit_complete_order(producer, &pending).await;
+        } else {
+            // Ещё ждём — вернуть в буфер
+            buf.insert(key, pending).await;
+        }
+    }
+    // Если заказ ещё не пришёл — буферизовать item отдельно
+}
+```
+
+Плюсы: один output event с полными данными.
+Минусы: нужно знать N заранее; если одна из N позиций потеряется — заказ «зависнет» в буфере навсегда (нужен timeout).
+
+
+#### Timeout-based collect (неизвестное N) {#timeout-based-collect--неизвестное-n}
+
+N неизвестно или может меняться. Собираем позиции в буфере, emit-им по таймауту — «всё, что собрали за T секунд, считаем полным набором».
+
+```text
+t=0: Order("ORD-1") → create buffer entry, start timer(30s)
+t=1: LineItem(line=1) → append to buffer
+t=3: LineItem(line=2) → append to buffer
+t=8: LineItem(line=3) → append to buffer
+t=30: timer fired → emit { order: "ORD-1", items: [1, 2, 3] }
+```
+
+Плюсы: не нужно знать N; устойчив к потере отдельных позиций (emit то, что есть).
+Минусы: задержка = timeout; если позиция придёт после timeout — потеряна (или нужен correction, как в left join).
+
+
+#### Completion event {#completion-event}
+
+Продюсер отправляет явное событие «конец группы» (`type=order_complete`). Collector ждёт именно его:
+
+```text
+LineItem(order="ORD-1", line=1)
+LineItem(order="ORD-1", line=2)
+LineItem(order="ORD-1", line=3)
+OrderComplete(order="ORD-1")  ← сигнал: все позиции отправлены
+```
+
+Плюсы: точный момент emit-а без timeout.
+Минусы: требует кооперации с продюсером; completion event может потеряться (нужен fallback timeout).
+
+
+### Выбор стратегии {#выбор-стратегии}
+
+| Стратегия            | N известно? | Задержка      | Полнота данных | Сложность |
+|----------------------|-------------|---------------|----------------|-----------|
+| **Eager emit**       | Неважно     | Минимальная   | Per-item       | Низкая    |
+| **Count-based**      | Да          | До последнего | Полная         | Средняя   |
+| **Timeout-based**    | Нет         | = timeout     | Best-effort    | Средняя   |
+| **Completion event** | Нет         | До сигнала    | Полная         | Средняя   |
+
+Рекомендации:
+
+-   Downstream умеет агрегировать сам (Kafka Streams, Flink, БД с GROUP BY) → **eager emit**
+-   N известно и невелико (&lt; 100) → **count-based** с fallback timeout
+-   N неизвестно, eventual consistency допустима → **timeout-based**
+-   Контролируете обоих продюсеров → **completion event** с fallback timeout
+
+
+### 1:N и память {#1-n-и-память}
+
+Для count-based и timeout-based стратегий буфер хранит не одно pending event, а **коллекцию**. Оценка памяти: если средний заказ = 10 позиций по 200 байт, 100K pending заказов = 100K × 10 × 200 = **200 MB**. При больших N или payload — переходить на RocksDB (хранить `Vec<LineItem>` сериализованным в value).
+
+Cuckoo filter по-прежнему работает: ключ фильтра — `order_id`, L2 хранит коллекцию.
+
+
+## Multi-way join: 3+ топика {#multi-way-join-3-plus-топика}
+
+Все подходы выше рассматривают join двух топиков. На практике нередко нужно объединить 3 и более.
+
+
+### Каскад попарных join-ов {#каскад-попарных-join-ов}
+
+Самый прямолинейный путь: join(A, B) → промежуточный результат → join(AB, C).
+
+```text
+Topic A ──┐
+          ├── join(A, B) ──► Intermediate AB ──┐
+Topic B ──┘                                    ├── join(AB, C) ──► Result
+Topic C ──────────────────────────────────────-┘
+```
+
+Каждый этап — один из подходов 1--5. Промежуточный результат может быть Kafka-топиком (добавляет hop и latency) или in-process (если всё в одном consumer).
+
+Проблема: **latency растёт линейно** с количеством join-ов. Для N топиков — N-1 последовательных этапов.
+
+
+### Star schema: один «центральный» топик {#star-schema-один-центральный-топик}
+
+Если один топик содержит ключи для всех остальных (как fact table в star schema), можно делать N-1 независимых lookup-ов параллельно:
+
+```text
+Topic A (fact) ──► Consumer: для каждого event
+                     ├── lookup в Table B (by key_b из body)
+                     ├── lookup в Table C (by key_c из body)
+                     └── emit enriched(A + B + C)
+```
+
+Таблицы B, C — compacted topics или embedded stores ([подход 2](#подход-2-compacted-topic-как-lookup-table) / [подход 3](#подход-3-embedded-state-store--rocksdb-badgerdb-sqlite)). Latency = один hop (только чтение fact topic), но память = сумма всех справочников.
+
+
+### Когда не стоит делать вручную {#когда-не-стоит-делать-вручную}
+
+При 3+ топиках сложность ручного join-а растёт быстро: state management, rebalancing, exactly-once — всё умножается на количество этапов. Это тот случай, когда Kafka Streams (`KStream.join().join()`), Flink SQL или [Arroyo](#обзор-существующих-решений) окупают себя.
+
+
 ## Общие edge cases и рекомендации {#общие-edge-cases-и-рекомендации}
 
 
@@ -632,18 +845,23 @@ Lookup по ключу — проверить все 16 активных bucket-
 -   Cuckoo filter: 1M × 12 бит = **1.5 MB**
 -   `HashMap<String, _>` только на ключи: **50--100 MB**
 
+**Когда фильтр НЕ помогает**: если match rate высокий (&gt;30--50% событий Topic B находят пару), фильтр пропускает большинство событий на L2, и overhead на insert/delete в фильтр + false positive lookups **превышает** экономию. Фильтр эффективен, когда pending ключи — малая доля от общего потока Topic B (типично: &lt;5% match rate).
+
 
 ### Двухуровневая архитектура: Cuckoo (L1) + RocksDB (L2) {#двухуровневая-архитектура-cuckoo--l1--plus-rocksdb--l2}
 
 ```text
-Topic B event ──► Cuckoo filter (L1, in-memory)
+Topic B event ──► Cuckoo filter (L1, RAM)
                     │
-                    ├── "нет" ──► skip (99% событий)
+                    ├── "нет" → skip (99% событий)
                     │
-                    └── "возможно да" ──► RocksDB lookup (L2, on-disk)
-                                            │
-                                            ├── найден ──► emit joined, удалить из L1 и L2
-                                            └── не найден ──► false positive, skip
+                    └── "возможно да"
+                          │
+                          ▼
+                        RocksDB (L2, disk)
+                          │
+                          ├── найден → emit, del L1+L2
+                          └── не найден → FP, skip
 ```
 
 При 1M pending ключей, Topic B 100K events/sec, match rate ~1%:
@@ -686,23 +904,28 @@ RocksDB сам использует [Bloom filter](https://github.com/facebook/r
 Собираем всё: 4-часовое окно, 1--5M pending ключей, payload ~1 KB.
 
 ```text
-Topic A ──► extract join key ──► hash to u64 ──► insert into:
-                                                  ├── Cuckoo filter (L1, ~7.5 MB)
-                                                  └── Time-bucketed RocksDB (L2, on-disk)
-                                                       key: u64 hash
-                                                       value: projected payload (~60 байт)
-                                                       16 buckets по 15 мин
+Topic A ──► extract join key ──► hash(u64)
+              │
+              ├── Cuckoo filter (L1, ~7.5 MB)
+              └── Time-bucketed RocksDB (L2, disk)
+                    key: u64 hash
+                    value: projection (~60 байт)
+                    16 buckets × 15 мин
 
-Topic B ──► extract key ──► hash to u64 ──► check Cuckoo filter (L1)
-                                              │
-                                              ├── miss → skip (99% events)
-                                              └── hit → RocksDB lookup (L2)
-                                                    │
-                                                    ├── found → emit joined, delete from L1+L2
-                                                    └── not found → false positive, skip
+Topic B ──► extract key ──► hash(u64)
+              │
+              ▼
+          Cuckoo filter (L1)
+              │
+              ├── miss → skip (99%)
+              └── hit → RocksDB (L2)
+                    │
+                    ├── found → emit, del L1+L2
+                    └── not found → FP, skip
 
-Eviction: каждые 15 минут → drop oldest time bucket из RocksDB
-                            → rebuild Cuckoo filter (или per-bucket filters)
+Eviction: каждые 15 мин
+  → drop oldest bucket из RocksDB
+  → rebuild Cuckoo (или per-bucket filters)
 ```
 
 
@@ -717,6 +940,43 @@ Eviction: каждые 15 минут → drop oldest time bucket из RocksDB
 | **Итого Disk**      | **~400 MB**     |
 
 Для сравнения: наивный `HashMap<String, FullEvent>` на 5M entries = **~5.5 GB RAM**.
+
+
+## Какой подход выбрать: дерево решений {#какой-подход-выбрать-дерево-решений}
+
+Шпаргалка для быстрого выбора подхода на основе характеристик задачи.
+
+```text
+Join key — это Kafka key в обоих топиках?
+│
+├── ДА → Топики co-partitioned?
+│         │
+│         ├── ДА → State помещается в RAM?
+│         │         ├── ДА → Подход 1: In-memory HashMap
+│         │         └── НЕТ → Подход 3: Embedded store
+│         │
+│         └── НЕТ → Можно пересоздать топик?
+│                   ├── ДА → Пересоздать, подход 1 или 3
+│                   └── НЕТ → Подход 4: Repartitioning
+│
+└── НЕТ → Join key в теле сообщения (payload)
+          │
+          ├── Один топик — справочник?
+          │   ├── ДА, в RAM → Подход 2: Compacted + HashMap
+          │   └── ДА, не в RAM → Подход 2 + embedded store
+          │
+          ├── Оба топика — потоки событий?
+          │   ├── Есть БД → Подход 5: Database-backed
+          │   ├── Высокий throughput → Repartitioning
+          │   └── Один маленький → Глобальный буфер
+          │
+          └── Миллионы pending ключей?
+              → Cuckoo/BinaryFuse (L1) + RocksDB (L2)
+
+Ортогональные решения:
+├── Left/outer join → Timeout/watermark emit
+└── 1:N join → Count-based / timeout / completion
+```
 
 
 ## Что делает Kafka Streams под капотом {#что-делает-kafka-streams-под-капотом}
@@ -894,13 +1154,15 @@ async fn main() {
                 };
                 match msg.topic() {
                     "orders" => {
-                        if let Ok(order) = serde_json::from_slice::<Order>(payload) {
+                        let ok = serde_json::from_slice::<Order>(payload);
+                        if let Ok(order) = ok {
                             try_join_order(&buffer, &producer, order).await;
                         }
                     }
                     "payments" => {
-                        if let Ok(payment) = serde_json::from_slice::<Payment>(payload) {
-                            try_join_payment(&buffer, &producer, payment).await;
+                        let ok = serde_json::from_slice::<Payment>(payload);
+                        if let Ok(pay) = ok {
+                            try_join_payment(&buffer, &producer, pay).await;
                         }
                     }
                     _ => {}
@@ -912,7 +1174,11 @@ async fn main() {
     }
 }
 
-async fn try_join_order(buf: &JoinBuffer, producer: &FutureProducer, order: Order) {
+async fn try_join_order(
+    buf: &JoinBuffer,
+    producer: &FutureProducer,
+    order: Order,
+) {
     let key = order.payment_ref.clone();
     match buf.remove(&key).await {
         Some(Pending::HasPayment(payment)) => {
@@ -924,7 +1190,11 @@ async fn try_join_order(buf: &JoinBuffer, producer: &FutureProducer, order: Orde
     }
 }
 
-async fn try_join_payment(buf: &JoinBuffer, producer: &FutureProducer, payment: Payment) {
+async fn try_join_payment(
+    buf: &JoinBuffer,
+    producer: &FutureProducer,
+    payment: Payment,
+) {
     let key = payment.payment_id.clone();
     match buf.remove(&key).await {
         Some(Pending::HasOrder(order)) => {
@@ -936,7 +1206,11 @@ async fn try_join_payment(buf: &JoinBuffer, producer: &FutureProducer, payment: 
     }
 }
 
-async fn emit_joined(producer: &FutureProducer, order: &Order, payment: &Payment) {
+async fn emit_joined(
+    producer: &FutureProducer,
+    order: &Order,
+    payment: &Payment,
+) {
     let joined = serde_json::json!({
         "order_id": order.order_id,
         "payment_id": payment.payment_id,
@@ -1116,6 +1390,30 @@ fn take_pending(db: &DB, join_key: &str) -> Option<Pending> {
 4.  **Rebalance и state** — при rebalance `moka` cache **не знает** про партиции. Если один инстанс получал партицию 0 «orders» и положил pending event в cache, а после rebalance партиция ушла другому инстансу — pending event останется в cache первого инстанса и никогда не будет matched. Для partition-local join нужно вести отдельный state per partition (`HashMap<(topic, partition), Cache>`) и очищать при `Rebalance::Revoke`.
 
 5.  **Backpressure** — `FutureProducer::send` блокирует, если внутренний буфер librdkafka заполнен (`queue.buffering.max.messages`, дефолт 100000). При высоком throughput join-а producer может стать бутылочным горлышком.
+
+6.  **Дубликаты ключей** — в скетче выше `try_join_order` при повторном ордере с тем же `payment_ref` молча перезаписывает pending entry в буфере. Первый ордер теряется. Если дубликаты возможны — нужна стратегия: хранить `Vec<Order>` вместо одного, либо reject с логированием, либо использовать `entry_or_insert` и проверять.
+
+7.  **Graceful shutdown** — скетч не обрабатывает SIGTERM. В production нужно перехватывать сигнал, прекратить потребление, flush pending state (отправить в DLT или changelog), commit offsets:
+
+<!--listend-->
+
+```rust
+use tokio::signal;
+
+loop {
+    tokio::select! {
+        msg = consumer.recv() => {
+            // обработка как в скетче выше
+        }
+        _ = signal::ctrl_c() => {
+            tracing::info!("shutting down: flushing pending state");
+            // Итерировать buffer, отправить unmatched в DLT
+            // consumer.commit_consumer_state(CommitMode::Sync).unwrap();
+            break;
+        }
+    }
+}
+```
 
 
 ## Обзор существующих решений {#обзор-существующих-решений}
