@@ -19,11 +19,11 @@ Strong DevOps background — equally comfortable designing service architecture 
 ## Experience
 
 ### Wildberries — Rust Backend Developer
-*2024 — present*
+*2024 — 2026*
 
-One of the largest marketplaces in Russia. Started in the media rendering team — transcoding and processing product photos and videos for CDN delivery across the platform. Later moved to a new team building the user reviews pipeline: ingesting, processing and serving billions of review records with a focus on reliability and low-latency delivery under heavy traffic.
+One of the largest marketplaces in Russia. Started in the media rendering team — transcoding and processing product photos and videos for CDN delivery across the platform. Later moved to a combined team building the user reviews pipeline: ingesting, processing and serving billions of review records with a focus on reliability and low-latency delivery under heavy traffic. The team was split between Rust and Go — I mostly worked in Rust but occasionally contributed to colleagues' Go projects. Infrastructure was hybrid: some services on bare metal deployed via Ansible, others in Kubernetes.
 
-{{< techs >}}{{< tech "Rust" >}} {{< tech "Tokio" >}} {{< tech "Axum" >}} {{< tech "FFmpeg" >}} {{< tech "PostgreSQL" >}} {{< tech "Kafka" >}} {{< tech "Elasticsearch" >}} {{< tech "Kubernetes" >}} {{< tech "Ansible" >}}{{< /techs >}}
+{{< techs >}}{{< tech "Rust" >}} {{< tech "Go" >}} {{< tech "Tokio" >}} {{< tech "Axum" >}} {{< tech "FFmpeg" >}} {{< tech "PostgreSQL" >}} {{< tech "Kafka" >}} {{< tech "Elasticsearch" >}} {{< tech "Kubernetes" >}} {{< tech "Ansible" >}}{{< /techs >}}
 
 ---
 
